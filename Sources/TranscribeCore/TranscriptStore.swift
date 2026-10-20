@@ -66,6 +66,13 @@ public struct TranscriptStore: Sendable {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
+    @discardableResult
+    public func trash(_ id: UUID) throws -> URL? {
+        var trashedURL: NSURL?
+        try FileManager.default.trashItem(at: folder(id), resultingItemURL: &trashedURL)
+        return trashedURL as URL?
+    }
+
     public func loadAll() throws -> [Transcript] {
         var result: [Transcript] = []
         for directory in try FileManager.default.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil) {

@@ -125,6 +125,60 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         catch { errorMessage = error.localizedDescription }
     }
 
+    var canManageRecording: Bool { !locked && !saveFailed && selected != nil }
+
+    func renameRecording(_ id: UUID? = nil) {
+        guard !locked, !saveFailed, let index = projects.firstIndex(where: { $0.id == (id ?? selectedID) }) else { return }
+        let transcript = projects[index]
+        let alert = NSAlert()
+        alert.messageText = "Rename Recording"
+        alert.informativeText = "Enter a name for this recording."
+        let field = NSTextField(string: transcript.title)
+        field.frame = NSRect(x: 0, y: 0, width: 320, height: 26)
+        field.font = .systemFont(ofSize: 14)
+        field.setAccessibilityLabel("Recording name")
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Rename")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn, !locked, !saveFailed else { return }
+        let title = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { errorMessage = "Enter a recording name that is not blank."; return }
+        var renamed = transcript
+        renamed.title = title
+        do {
+            try store.save(renamed)
+            if let current = projects.firstIndex(where: { $0.id == transcript.id }) { projects[current] = renamed }
+        } catch { errorMessage = "Cannot rename this recording: \(error.localizedDescription)" }
+    }
+
+    func deleteRecording(_ id: UUID? = nil) {
+        guard !locked, !saveFailed, let index = projects.firstIndex(where: { $0.id == (id ?? selectedID) }) else { return }
+        let transcript = projects[index]
+        let alert = NSAlert()
+        alert.messageText = "Move “\(transcript.title)” to Trash?"
+        alert.informativeText = "This moves the recording's saved audio, transcript and summary to the Mac’s Trash. You can recover the project folder from Trash. Imported source files stay where they are."
+        alert.alertStyle = .warning
+        let trashButton = alert.addButton(withTitle: "Move to Trash")
+        trashButton.hasDestructiveAction = true
+        trashButton.keyEquivalent = ""
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\r"
+        guard alert.runModal() == .alertFirstButtonReturn, !locked, !saveFailed else { return }
+        let deletingSelection = selectedID == transcript.id
+        if deletingSelection { player?.stop(); player = nil; isPlaying = false }
+        do {
+            try store.trash(transcript.id)
+            projects.removeAll { $0.id == transcript.id }
+            if deletingSelection {
+                selectedID = projects.isEmpty ? nil : projects[min(index, projects.count - 1)].id
+                loadPlayback()
+            }
+        } catch {
+            if deletingSelection { loadPlayback() }
+            errorMessage = "Cannot move this recording to Trash: \(error.localizedDescription)"
+        }
+    }
+
     func openFile() {
         guard !locked else { return }
         let panel = NSOpenPanel()

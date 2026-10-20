@@ -36,6 +36,12 @@ import AppKit
                 Button("Import Audio…", action: model.openFile).keyboardShortcut("o").disabled(model.locked)
                 Button("Record Microphone", action: model.startRecording).keyboardShortcut("r").disabled(model.locked)
             }
+            CommandGroup(after: .newItem) {
+                Button("Rename Recording…") { model.renameRecording() }
+                    .keyboardShortcut("r", modifiers: [.command, .shift]).disabled(!model.canManageRecording)
+                Button("Move Recording to Trash…") { model.deleteRecording() }
+                    .keyboardShortcut(.delete, modifiers: .command).disabled(!model.canManageRecording)
+            }
             CommandGroup(after: .appSettings) {
                 Button("Models…") { model.showModels = true }
                 Button("Show Local Library") { NSWorkspace.shared.open(model.store.projects) }

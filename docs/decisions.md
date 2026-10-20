@@ -120,3 +120,10 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 
 - Replace 9–11 point labels and caption styles with standard 13-point body text across the library, timestamps, speaker names, status, summary options, Settings and model setup. Recording titles use 14 points; transcript, summary and live preview text use 16 points with the existing line spacing.
 - Widen timestamp/playback labels for the larger text, use a regular playback slider and footer buttons, and improve document metadata contrast. Keep the shared two-tab layout.
+
+
+## Recording library actions (2026-10-21)
+
+- Add Rename and Move to Trash to each recording's context menu and the File menu, plus a selected-recording Trash button in the sidebar and Delete handling when the list has focus. Rename uses ⇧⌘R; Trash uses ⌘⌫. Keep direct title editing available.
+- Confirm deletion with the recording title and scope. Move the whole UUID project directory using macOS Trash; imported originals and shared models stay in place. Restore the project folder into Projects and reopen to recover it.
+- Block both operations while processing/recording or when edits have failed to save. Update the list only after successful disk operations. Deleting the selected recording stops playback and selects a neighbor, or returns to the empty library. Rename changes metadata without changing selection, audio, transcript or notes.

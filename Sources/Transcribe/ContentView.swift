@@ -32,13 +32,22 @@ struct ContentView: View {
                                 Spacer(minLength: 0)
                                 Text(Transcript.timestamp(project.duration)).font(.body.monospacedDigit()).foregroundStyle(.secondary)
                             }.padding(.vertical, 6).tag(project.id)
+                                .contextMenu {
+                                    Button("Rename…") { model.renameRecording(project.id) }
+                                    Button("Move to Trash…", role: .destructive) { model.deleteRecording(project.id) }
+                                }
                         }
                     }
                 }.listStyle(.sidebar).disabled(model.locked || model.saveFailed)
+                    .onDeleteCommand { model.deleteRecording() }
                 Divider()
                 HStack {
                     Label("On this Mac", systemImage: "internaldrive").font(.body).foregroundStyle(.secondary)
                     Spacer()
+                    Button { model.deleteRecording() } label: { Image(systemName: "trash") }
+                        .buttonStyle(.plain).help("Move selected recording to Trash…")
+                        .accessibilityLabel("Move selected recording to Trash")
+                        .disabled(!model.canManageRecording)
                     Button { model.showModels = true } label: { Image(systemName: "slider.horizontal.3") }
                         .buttonStyle(.plain).help("Models and local storage")
                 }.padding(16)
