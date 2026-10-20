@@ -66,7 +66,10 @@ import TranscribeCore
         let engine = LocalSpeechEngine(models: store.models, model: value("--model") ?? LocalSpeechEngine.defaultModel)
         let speakers = args.contains("--speakers")
         let progress: ProgressHandler = { update in
-            if update.fraction == nil { FileHandle.standardError.write(Data((update.message + "\n").utf8)) }
+            if update.fraction == nil || update.transcription != nil {
+                let sections = update.transcription.map { " · \($0.segments.count) preview sections" } ?? ""
+                FileHandle.standardError.write(Data((update.message + sections + "\n").utf8))
+            }
         }
         if args.contains("--prepare") { try await engine.prepare(speakers: speakers, progress: progress) }
         let original = try await store.importAudio(URL(fileURLWithPath: audioPath))

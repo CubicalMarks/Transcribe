@@ -89,3 +89,13 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Both documents use the same growing plain-text field, 15-point type, line spacing and scroll-area margins. Keep transcript timestamp/speaker controls and summary generation metadata/staleness indicators contextual.
 - Regeneration sits at the bottom like transcription reruns; first generation uses the same central empty-state action pattern. Remove the redundant Summarise shortcut under the transcript. Providers and credentials remain in native Settings.
 - Data format, engine behavior, edit persistence and export formats remain unchanged. The active tab selects its own copy/export actions; regenerated summaries still require replacement confirmation.
+
+
+## Transcription preview and progress (2026-10-21)
+
+- Use WhisperKit's completed-segment discovery callback on the existing incremental-file pipeline. Keep decoding options and model selection unchanged; no microphone streaming was added.
+- Relay read-only preview snapshots through a serialized, bounded AsyncStream. Each newest snapshot contains all discovered sections; finishing the reporter rejects late SDK callbacks, and the consumer drains before the engine returns.
+- Track the furthest valid discovered timestamp against recording duration. Clamp progress to the audio bounds, keep it monotonic, and remain indeterminate when duration/decoded position is unavailable. Progress advances by sections; no invented ETA or elapsed-time percentage.
+- Replace the idle empty state with loading/decoding status and preview text. Show percentages when available, live section count and distinct speaker-identification stages. Disable transcript export while the draft is displayed.
+- Preview state never enters the saved Transcript. Publish the complete result only after successful transcription, then clear the preview before speaker identification. Cancellation/failure clears it and preserves prior saved text and edits.
+- SDK contract inspected in the pinned v1.1.1 source: https://github.com/argmaxinc/argmax-oss-swift/blob/v1.1.1/Sources/WhisperKit/Core/WhisperKit.swift and Core/TranscribeTask.swift.

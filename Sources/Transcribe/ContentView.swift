@@ -175,7 +175,10 @@ struct ContentView: View {
                     Text("Transcript").tag(false)
                     Text("Summary").tag(true)
                 }.pickerStyle(.segmented).labelsHidden().frame(width: 200)
-                if model.showSummary, let summary = transcript.summary {
+                if !model.showSummary, let preview = model.transcriptionPreview {
+                    Text(preview.segments.isEmpty ? "Live preview" : "\(preview.segments.count) sections ready")
+                        .font(.caption).foregroundStyle(.tertiary)
+                } else if model.showSummary, let summary = transcript.summary {
                     Text(summary.preset.title).font(.caption).foregroundStyle(.tertiary)
                     if transcript.summaryIsOutdated {
                         Label("Transcript changed", systemImage: "arrow.clockwise")
@@ -204,9 +207,13 @@ struct ContentView: View {
                         }
                     } label: { Label("Export", systemImage: "square.and.arrow.up") }
                     .menuStyle(.borderlessButton).fixedSize()
+                    .disabled(!model.showSummary && model.transcriptionPreview != nil)
                 }
             }.padding(.horizontal, 26).padding(.vertical, 14)
-            if model.showSummary ? transcript.summary == nil : transcript.segments.isEmpty {
+            if !model.showSummary, let preview = model.transcriptionPreview {
+                TranscriptionProgressView(preview: preview, status: model.status, fraction: model.fraction,
+                    hasSavedTranscript: !transcript.segments.isEmpty)
+            } else if model.showSummary ? transcript.summary == nil : transcript.segments.isEmpty {
                 documentEmptyState(transcript)
             } else {
                 ScrollView {
@@ -339,7 +346,10 @@ struct ContentView: View {
     private var footer: some View {
         HStack(spacing: 10) {
             if model.isBusy {
-                if let fraction = model.fraction { ProgressView(value: fraction).frame(width: 95) }
+                if let fraction = model.fraction {
+                    ProgressView(value: fraction).frame(width: 95)
+                    Text(fraction, format: .percent.precision(.fractionLength(0))).font(.caption.monospacedDigit())
+                }
                 else { ProgressView().controlSize(.small) }
             } else { Image(systemName: model.saveFailed ? "exclamationmark.triangle" : "lock.shield").foregroundStyle(.secondary) }
             Text(model.status.isEmpty ? "Local processing · Models download once, audio stays here" : model.status)

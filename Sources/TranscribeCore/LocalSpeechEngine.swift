@@ -5,7 +5,10 @@ import SpeakerKit
 public struct EngineProgress: Sendable {
     public var message: String
     public var fraction: Double?
-    public init(_ message: String, fraction: Double? = nil) { self.message = message; self.fraction = fraction }
+    public var transcription: TranscriptionPreview?
+    public init(_ message: String, fraction: Double? = nil, transcription: TranscriptionPreview? = nil) {
+        self.message = message; self.fraction = fraction; self.transcription = transcription
+    }
 }
 public typealias ProgressHandler = @Sendable (EngineProgress) async -> Void
 
@@ -96,6 +99,13 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
         }
         await progress(.init("Loading transcription model…"))
         let pipe = try await loadWhisper(folder)
+        let reporter = TranscriptionProgressReporter(duration: transcript.duration)
+        let delivery = Task { for await update in reporter.updates { await progress(update) } }
+        pipe.segmentDiscoveryCallback = { discovered in
+            reporter.receive(discovered.map {
+                .init(start: Double($0.start), end: Double($0.end), text: $0.text.trimmingCharacters(in: .whitespacesAndNewlines))
+            })
+        }
         do {
             try Task.checkCancellation()
             await progress(.init("Transcribing on this Mac…"))
@@ -107,7 +117,11 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
             let results = try await pipe.transcribe(audioPath: audio.path,
                 audioInputOptions: AudioInputOptions(audioLoadingMode: .incremental),
                 decodeOptions: options, callback: { _ in !Task.isCancelled })
+            reporter.finish()
+            await delivery.value
+            pipe.segmentDiscoveryCallback = nil
             try Task.checkCancellation()
+            await progress(.init("Saving transcript…", fraction: 1))
             var output = transcript
             output.segments = results.flatMap(\.segments).map {
                 .init(start: Double($0.start), end: Double($0.end), text: $0.text.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -121,6 +135,9 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
             await pipe.unloadModels()
             return output
         } catch {
+            reporter.finish()
+            await delivery.value
+            pipe.segmentDiscoveryCallback = nil
             await pipe.unloadModels()
             throw error
         }

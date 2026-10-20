@@ -16,6 +16,7 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var isBusy = false
     var status = ""
     var fraction: Double?
+    var transcriptionPreview: TranscriptionPreview?
     var errorMessage: String?
     var showModels = false
     var showSummary = false
@@ -153,7 +154,7 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         fraction = nil
         task = Task {
             defer {
-                if operationID == id { isBusy = false; fraction = nil; operationID = nil; task = nil }
+                if operationID == id { isBusy = false; fraction = nil; transcriptionPreview = nil; operationID = nil; task = nil }
             }
             do {
                 try await operation(id)
@@ -175,7 +176,8 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     private func receive(_ update: EngineProgress, for id: UUID) {
         guard operationID == id, task?.isCancelled == false else { return }
         status = update.message
-        fraction = update.fraction
+        fraction = update.fraction.flatMap { $0.isFinite ? max(0, min(1, $0)) : nil }
+        if transcriptionPreview != nil, let preview = update.transcription { transcriptionPreview = preview }
     }
 
     func cancel() {
@@ -207,12 +209,15 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         let selectedLanguage = language == "auto" ? nil : language
         let includeSpeakers = identifySpeakers
         let count = expectedSpeakers == 0 ? nil : expectedSpeakers
+        showSummary = false
+        transcriptionPreview = .init(duration: transcript.duration)
         run("Starting transcription…") { [self] id in
             let audio = try store.audioURL(transcript)
             let result = try await engine.transcribe(audio: audio, transcript: transcript,
                 language: selectedLanguage, progress: progress(for: id))
             try Task.checkCancellation()
             try put(result)
+            transcriptionPreview = nil
             if includeSpeakers, !result.segments.isEmpty {
                 let attributed = try await engine.identifySpeakers(audio: audio, transcript: result,
                     count: count, progress: progress(for: id))
