@@ -34,11 +34,11 @@ struct SummaryOptionsView: View {
                         : "Only transcript text is sent. Configure the destination in Settings.")
                 Spacer(minLength: 8)
                 SettingsLink { Text("Settings…") }.buttonStyle(.borderless)
-            }.font(.caption).foregroundStyle(.secondary)
+            }.font(.body).foregroundStyle(.secondary)
             DisclosureGroup("Additional instructions", isExpanded: $showInstructions) {
                 TextField("What should the summary focus on?", text: $model.summarySettings.extraInstructions, axis: .vertical)
                     .textFieldStyle(.roundedBorder).lineLimit(1...3).padding(.top, 6)
-            }.font(.caption2).foregroundStyle(.secondary)
+            }.font(.body).foregroundStyle(.secondary)
         }.onAppear { showInstructions = !model.summarySettings.extraInstructions.isEmpty }
     }
 }
@@ -50,7 +50,7 @@ struct RecordingTextField: View {
 
     var body: some View {
         TextField(title, text: $text, axis: .vertical)
-            .textFieldStyle(.plain).font(.system(size: 15)).lineSpacing(5)
+            .textFieldStyle(.plain).font(.system(size: 16)).lineSpacing(5)
     }
 }
 
@@ -64,7 +64,7 @@ struct SummaryContentView: View {
                     Text(summary.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                     Text("·")
                     Text(summary.model)
-                }.font(.caption).foregroundStyle(.secondary)
+                }.font(.body).foregroundStyle(.secondary)
                 RecordingTextField(title: "Summary", text: Binding(get: { model.selected?.summary?.text ?? "" }, set: { value in
                     model.edit { $0.summary?.text = value }
                 })).disabled(model.locked).accessibilityLabel("Editable summary")
@@ -93,7 +93,7 @@ struct SummarySettingsView: View {
                     }
                     if draft.backend == .onDevice {
                         Text(OnDeviceSummaryGenerator.unavailableReason ?? "Uses Apple's on-device model. Transcript text stays on this Mac.")
-                            .font(.callout).foregroundStyle(.secondary)
+                            .font(.body).foregroundStyle(.secondary)
                     }
                 }
                 if draft.backend == .chatGPT {
@@ -107,9 +107,9 @@ struct SummarySettingsView: View {
                         TextField("Model", text: $draft.model, prompt: Text("Model identifier"))
                         SecureField("API key", text: $apiKey, prompt: Text("Enter key, or leave blank to keep saved key"))
                             .disabled(removeSavedKey)
-                        Text(keyStatus).font(.caption).foregroundStyle(.secondary)
+                        Text(keyStatus).font(.body).foregroundStyle(.secondary)
                     } footer: {
-                        Text("The key is stored per API URL in macOS Keychain. A blank field keeps an existing key.")
+                        Text("The key is stored per API URL in macOS Keychain. A blank field keeps an existing key.").font(.body)
                     }
                     Section {
                         DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
@@ -125,7 +125,7 @@ struct SummarySettingsView: View {
                     }
                     Section {
                         Text("Only transcript text is sent to \((try? draft.completionURL().host) ?? "the configured endpoint"). No audio is uploaded. Provider charges may apply.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.body).foregroundStyle(.secondary)
                     }
                 }
             }.formStyle(.grouped).disabled(model.locked)
@@ -145,9 +145,9 @@ struct SummarySettingsView: View {
                 }
                 .onChange(of: draft.baseURL) { _, _ in apiKey = ""; removeSavedKey = false; refreshKeyStatus() }
                 .onChange(of: draft.model) { _, _ in refreshKeyStatus() }
-            if let message { Text(message).font(.caption).foregroundStyle(.red).padding(.horizontal, 24).padding(.bottom, 12) }
+            if let message { Text(message).font(.body).foregroundStyle(.red).padding(.horizontal, 24).padding(.bottom, 12) }
             if model.locked {
-                Text("Settings can be changed when processing finishes.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 24)
+                Text("Settings can be changed when processing finishes.").font(.body).foregroundStyle(.secondary).padding(.horizontal, 24)
             }
             HStack {
                 Spacer()
@@ -170,7 +170,7 @@ struct SummarySettingsView: View {
             }.disabled(model.chatGPT.busy)
             if let account = model.chatGPT.accounts.first(where: { $0.id == draft.chatGPTAccountID }) {
                 Text(account.tokens == nil ? "Signed out" : account.planEnabled ? "ChatGPT plan usage enabled" : "ChatGPT plan usage not enabled")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.body).foregroundStyle(.secondary)
                 HStack {
                     Button(account.planEnabled || account.tokens == nil ? "Reconnect" : "Enable plan usage") { model.chatGPT.connect(accountID: account.id) }
                     if account.tokens != nil { Button("Sign Out") { model.chatGPT.signOut(account.id) } }
@@ -189,22 +189,22 @@ struct SummarySettingsView: View {
                         .help("Reuse the previous registration after an interrupted code exchange.")
                 }
             }
-            if let message = model.chatGPT.message { Text(message).font(.caption).foregroundStyle(.secondary) }
+            if let message = model.chatGPT.message { Text(message).font(.body).foregroundStyle(.secondary) }
         } footer: {
-            Text("Connect an eligible ChatGPT Plus or Pro plan. Account connections are saved when sign-in finishes; Save Changes applies your provider and model choice.")
+            Text("Connect an eligible ChatGPT Plus or Pro plan. Account connections are saved when sign-in finishes; Save Changes applies your provider and model choice.").font(.body)
         }
         Section {
             if model.chatGPT.modelsAccountID == draft.chatGPTAccountID, !model.chatGPT.models.isEmpty {
                 Picker("Model", selection: $draft.chatGPTModel) {
                     ForEach(model.chatGPT.models) { Text($0.display_name).tag(Optional($0.slug)) }
                 }
-            } else { Text("Connect an account with plan usage enabled to choose a model.").font(.callout).foregroundStyle(.secondary) }
+            } else { Text("Connect an account with plan usage enabled to choose a model.").font(.body).foregroundStyle(.secondary) }
             Button("Refresh Models") { model.chatGPT.loadModels(accountID: draft.chatGPTAccountID) }.disabled(model.chatGPT.busy)
         }
         Section {
             Link("Manage ChatGPT Usage", destination: URL(string: "https://chatgpt.com/settings/usage")!)
             Text("Summaries use your existing ChatGPT plan limits or available credits. Only transcript text is sent to OpenAI; audio stays on this Mac. No automatic switch to API billing.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.body).foregroundStyle(.secondary)
         }
     }
 

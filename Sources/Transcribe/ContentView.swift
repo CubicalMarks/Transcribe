@@ -14,7 +14,7 @@ struct ContentView: View {
                     Image(systemName: "waveform").font(.title2).foregroundStyle(.indigo)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Transcribe").font(.headline)
-                        Text("YOUR LOCAL LIBRARY").font(.system(size: 9, weight: .semibold)).tracking(1.2).foregroundStyle(.secondary)
+                        Text("Your local library").font(.body).foregroundStyle(.secondary)
                     }
                     Spacer()
                 }.padding(20)
@@ -25,19 +25,19 @@ struct ContentView: View {
                                 Image(systemName: project.segments.isEmpty ? "waveform" : "text.alignleft")
                                     .foregroundStyle(.indigo).padding(.top, 3)
                                 VStack(alignment: .leading, spacing: 5) {
-                                    Text(project.title).font(.system(size: 12, weight: .medium)).lineLimit(2)
+                                    Text(project.title).font(.system(size: 14, weight: .medium)).lineLimit(2)
                                     Text(project.createdAt, format: .dateTime.month(.abbreviated).day())
-                                        .font(.caption2).foregroundStyle(.secondary)
+                                        .font(.body).foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength: 0)
-                                Text(Transcript.timestamp(project.duration)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                                Text(Transcript.timestamp(project.duration)).font(.body.monospacedDigit()).foregroundStyle(.secondary)
                             }.padding(.vertical, 6).tag(project.id)
                         }
                     }
                 }.listStyle(.sidebar).disabled(model.locked || model.saveFailed)
                 Divider()
                 HStack {
-                    Label("On this Mac", systemImage: "internaldrive").font(.caption).foregroundStyle(.secondary)
+                    Label("On this Mac", systemImage: "internaldrive").font(.body).foregroundStyle(.secondary)
                     Spacer()
                     Button { model.showModels = true } label: { Image(systemName: "slider.horizontal.3") }
                         .buttonStyle(.plain).help("Models and local storage")
@@ -96,7 +96,7 @@ struct ContentView: View {
                 Image(systemName: "arrow.down.doc").font(.system(size: 27)).foregroundStyle(.secondary)
                 VStack(spacing: 5) {
                     Text("Drop an audio file here").font(.headline)
-                    Text("M4A, AAC, MP3, WAV and other supported audio").font(.caption).foregroundStyle(.secondary)
+                    Text("M4A, AAC, MP3, WAV and other supported audio").font(.body).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
                     Button("Open Audio…", action: model.openFile).buttonStyle(.borderedProminent).controlSize(.large)
@@ -108,7 +108,7 @@ struct ContentView: View {
                 .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.primary.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [5])))
             options.padding(.horizontal, 25).frame(maxWidth: 570)
             Label("Private by design. No audio uploads.", systemImage: "lock.shield")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.body).foregroundStyle(.secondary)
             Spacer()
         }.padding(30).frame(maxWidth: .infinity).disabled(model.isBusy)
     }
@@ -130,17 +130,17 @@ struct ContentView: View {
             }
             if model.identifySpeakers {
                 HStack {
-                    Text("Separate voices within this recording").font(.caption).foregroundStyle(.secondary)
+                    Text("Separate voices within this recording").font(.body).foregroundStyle(.secondary)
                     Spacer()
                     Picker("Speakers", selection: $model.expectedSpeakers) {
                         Text("Automatic").tag(0)
                         ForEach(1...12, id: \.self) { Text("\($0)").tag($0) }
-                    }.frame(width: 165).controlSize(.small)
+                    }.frame(width: 165).controlSize(.regular)
                 }
             }
             if model.language == "auto" {
                 Text("For mixed-language recordings, use Automatic and review language switches.")
-                    .font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.body).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -157,10 +157,10 @@ struct ContentView: View {
                             Text("·")
                             Text(Transcript.timestamp(model.playerDuration > 0 ? model.playerDuration : transcript.duration))
                             if let language = transcript.language { Text("·"); Text(Locale.current.localizedString(forLanguageCode: language) ?? language) }
-                        }.font(.caption).foregroundStyle(.secondary)
+                        }.font(.body).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Label("Audio local", systemImage: "lock.fill").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    Label("Audio local", systemImage: "lock.fill").font(.body.weight(.medium)).foregroundStyle(.secondary)
                         .padding(.horizontal, 10).padding(.vertical, 6).background(.quaternary, in: Capsule())
                 }
                 playback
@@ -177,16 +177,16 @@ struct ContentView: View {
                 }.pickerStyle(.segmented).labelsHidden().frame(width: 200)
                 if !model.showSummary, let preview = model.transcriptionPreview {
                     Text(preview.segments.isEmpty ? "Live preview" : "\(preview.segments.count) sections ready")
-                        .font(.caption).foregroundStyle(.tertiary)
+                        .font(.body).foregroundStyle(.secondary)
                 } else if model.showSummary, let summary = transcript.summary {
-                    Text(summary.preset.title).font(.caption).foregroundStyle(.tertiary)
+                    Text(summary.preset.title).font(.body).foregroundStyle(.secondary)
                     if transcript.summaryIsOutdated {
                         Label("Transcript changed", systemImage: "arrow.clockwise")
-                            .font(.caption).foregroundStyle(.orange)
+                            .font(.body).foregroundStyle(.orange)
                             .help("Review or regenerate the summary after editing the transcript.")
                     }
                 } else if !transcript.segments.isEmpty, !model.showSummary {
-                    Text("\(transcript.segments.count) segments").font(.caption).foregroundStyle(.tertiary)
+                    Text("\(transcript.segments.count) segments").font(.body).foregroundStyle(.secondary)
                 }
                 Spacer()
                 if !transcript.segments.isEmpty {
@@ -234,7 +234,7 @@ struct ContentView: View {
                     } else {
                         Button("Transcribe Again…", action: model.transcribe)
                     }
-                }.buttonStyle(.borderless).font(.caption).padding(20).disabled(model.locked || model.saveFailed)
+                }.buttonStyle(.borderless).font(.body).padding(20).disabled(model.locked || model.saveFailed)
             }
         }
     }
@@ -243,12 +243,12 @@ struct ContentView: View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: model.showSummary ? "text.badge.star" : "text.bubble")
-                .font(.system(size: 36)).foregroundStyle(.tertiary)
+                .font(.system(size: 36)).foregroundStyle(.secondary)
             Text(model.showSummary ? "Ready to summarise" : "Ready when you are").font(.title3.weight(.medium))
             Text(model.showSummary
                 ? transcript.segments.isEmpty ? "Transcribe this recording before creating a summary." : "Choose a preset and language, then summarise your transcript."
                 : "Your audio is saved. Choose a language and transcribe.")
-                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
             if model.showSummary, transcript.segments.isEmpty {
                 Button("Show Transcript") { model.showSummary = false }
                     .buttonStyle(.borderedProminent).controlSize(.large).disabled(model.locked)
@@ -265,8 +265,8 @@ struct ContentView: View {
     private func segmentRow(_ segment: TranscriptSegment, transcript: Transcript) -> some View {
         HStack(alignment: .top, spacing: 20) {
             Button { model.seek(segment.start, play: true) } label: {
-                Text(Transcript.timestamp(segment.start)).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-            }.buttonStyle(.plain).frame(width: 50, alignment: .leading).padding(.top, 4).help("Play from this timestamp")
+                Text(Transcript.timestamp(segment.start)).font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
+            }.buttonStyle(.plain).frame(width: 64, alignment: .leading).padding(.top, 4).help("Play from this timestamp")
             VStack(alignment: .leading, spacing: 7) {
                 if transcript.speakersIdentified {
                     Menu {
@@ -285,7 +285,7 @@ struct ContentView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Circle().fill(speakerColor(segment.speakerID)).frame(width: 6, height: 6)
-                            Text(transcript.speakerName(segment.speakerID)).font(.system(size: 11, weight: .semibold))
+                            Text(transcript.speakerName(segment.speakerID)).font(.system(size: 13, weight: .semibold))
                         }
                     }.menuStyle(.borderlessButton).fixedSize().disabled(model.locked)
                 }
@@ -316,10 +316,10 @@ struct ContentView: View {
                         })
                 }.frame(height: 34)
                 Slider(value: Binding(get: { model.playhead }, set: { model.seek($0) }), in: 0...max(0.01, model.playerDuration))
-                    .controlSize(.mini).disabled(model.playerDuration <= 0).accessibilityLabel("Playback position")
+                    .controlSize(.regular).disabled(model.playerDuration <= 0).accessibilityLabel("Playback position")
             }
             Text("\(Transcript.timestamp(model.playhead)) / \(Transcript.timestamp(model.playerDuration))")
-                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).frame(width: 98)
+                .font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary).frame(width: 132)
         }.padding(14).background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
     }
 
@@ -338,7 +338,7 @@ struct ContentView: View {
                 Button("Stop & Save") { model.stopRecording(transcribeAfter: false) }.controlSize(.large)
             }
             Text("Microphone only · Audio saved on this Mac\nMake sure everyone knows you are recording.")
-                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(4)
+                .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(4)
             Spacer()
         }.frame(maxWidth: .infinity).padding(30)
     }
@@ -348,15 +348,15 @@ struct ContentView: View {
             if model.isBusy {
                 if let fraction = model.fraction {
                     ProgressView(value: fraction).frame(width: 95)
-                    Text(fraction, format: .percent.precision(.fractionLength(0))).font(.caption.monospacedDigit())
+                    Text(fraction, format: .percent.precision(.fractionLength(0))).font(.body.monospacedDigit())
                 }
                 else { ProgressView().controlSize(.small) }
             } else { Image(systemName: model.saveFailed ? "exclamationmark.triangle" : "lock.shield").foregroundStyle(.secondary) }
             Text(model.status.isEmpty ? "Local processing · Models download once, audio stays here" : model.status)
-                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                .font(.body).foregroundStyle(.secondary).lineLimit(2)
             Spacer()
-            if model.saveFailed { Button("Retry Save", action: model.retrySave).controlSize(.small) }
-            if model.isBusy { Button("Cancel", action: model.cancel).controlSize(.small) }
+            if model.saveFailed { Button("Retry Save", action: model.retrySave).controlSize(.regular) }
+            if model.isBusy { Button("Cancel", action: model.cancel).controlSize(.regular) }
         }.padding(.horizontal, 20).frame(minHeight: 43)
     }
 
@@ -364,7 +364,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Speaker names").font(.title2.weight(.semibold))
             Text("Names apply to this recording. Voice labels are estimates; review them against the audio.")
-                .font(.callout).foregroundStyle(.secondary)
+                .font(.body).foregroundStyle(.secondary)
             ForEach(model.selected?.speakerIDs ?? [], id: \.self) { id in
                 TextField("Speaker \(id + 1)", text: Binding(get: { model.selected?.speakerNames[String(id)] ?? "" }, set: { value in
                     model.edit { $0.speakerNames[String(id)] = value }

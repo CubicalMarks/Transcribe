@@ -91,3 +91,10 @@ Hosted endpoint compatibility and summary quality still need validation with the
 - The existing synthetic account lifecycle HTTP fixture now delivers delta/done events followed by a completed response with an empty output array. Generation returns the accumulated summary through the real URLSession streaming path. Synthetic credentials remain isolated and are cleaned up after testing.
 - The user's actual event sequence was not captured, and no live account generation, real credential read or private transcript upload was performed by the agent. These tests confirm the parser gap and its correction; retrying with the user's connected account remains the live validation step.
 - After changing packaging to sign a staged bundle and swap it into dist, `make build` and `make lint` passed. The newly installed app and the retained previous bundle both passed strict signature verification. A disposable fixture exercised the actual installer and verified that the old open file descriptor retained its bytes/inode while the destination contained the new bundle contents.
+
+
+## Readable interface text — 2026-10-21
+
+- App 0.3.4 builds and passes strict ad-hoc signature verification and source/config lint. This change only adjusts interface typography, contrast and control/label sizing; inference and persistence are unchanged. No new unit tests were added for font declarations.
+- Visually checked an isolated preview with fictional Swedish/English transcript segments and saved notes. Both tabs show 16-point document text; supporting text, speaker names and timestamps use 13 points. A one-hour segment timestamp fits the widened column. The library title now uses normal case to fit its larger font.
+- Inspected native Settings in local and OpenAI API modes: provider/model fields, saved-key status, wrapped help text and buttons remain legible within the existing window. Cancelled the settings draft and quit the preview. No real credential value was read, private transcript opened or hosted generation performed. Live-progress/model-setup text shares the same font changes but was not manually exercised in this pass.

@@ -15,7 +15,7 @@ struct ModelsView: View {
                 }
             }
             Text("Transcribe downloads models and tokenizer files from Hugging Face. Audio processing stays on your Mac. Transcript text is sent only when you choose API summarisation. The first preparation can take several minutes.")
-                .font(.callout).foregroundStyle(.secondary)
+                .font(.body).foregroundStyle(.secondary)
             VStack(spacing: 18) {
                 modelRow("Whisper Turbo", subtitle: "Multilingual transcription · compressed 626 MB variant", ready: model.transcriptionReady)
                 Divider()
@@ -25,15 +25,15 @@ struct ModelsView: View {
             if model.isBusy {
                 VStack(alignment: .leading, spacing: 8) {
                     if let fraction = model.fraction { ProgressView(value: fraction) } else { ProgressView().controlSize(.small) }
-                    Text(model.status).font(.caption).foregroundStyle(.secondary)
+                    Text(model.status).font(.body).foregroundStyle(.secondary)
                 }
             }
             HStack(spacing: 18) {
                 Link("Whisper models", destination: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml")!)
                 Link("Speaker models & attribution", destination: URL(string: "https://huggingface.co/argmaxinc/speakerkit-coreml")!)
-            }.font(.caption)
+            }.font(.body)
             Text("WhisperKit and SpeakerKit: Argmax, MIT. Whisper models: MIT. Speaker models: CC BY 4.0, derived from Pyannote; converted and quantized by Argmax. See the bundled ThirdPartyNotices for details.")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.body).foregroundStyle(.secondary)
             HStack {
                 Button("Show Local Storage") { NSWorkspace.shared.open(model.store.root) }
                 Spacer()
@@ -50,11 +50,11 @@ struct ModelsView: View {
         HStack {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.headline)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                Text(subtitle).font(.body).foregroundStyle(.secondary)
             }
             Spacer()
             Label(ready ? "Ready" : "Not prepared", systemImage: ready ? "checkmark.circle.fill" : "arrow.down.circle")
-                .font(.caption).foregroundStyle(ready ? .green : .secondary)
+                .font(.body).foregroundStyle(ready ? .green : .secondary)
         }
     }
 }

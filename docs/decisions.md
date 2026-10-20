@@ -114,3 +114,9 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 
 - Build and sign a fresh app bundle in a unique .build staging directory, then atomically swap it into dist. Retain the previous bundle in the staging directory so existing processes keep their mapped executable unchanged.
 - A development-host crash report showed a CODESIGNING Invalid Page termination during an in-place rebuild. Replacing the bundle avoids overwriting a running signed executable. Reopen the app to use the installed build.
+
+
+## Readable supporting text (2026-10-21)
+
+- Replace 9–11 point labels and caption styles with standard 13-point body text across the library, timestamps, speaker names, status, summary options, Settings and model setup. Recording titles use 14 points; transcript, summary and live preview text use 16 points with the existing line spacing.
+- Widen timestamp/playback labels for the larger text, use a regular playback slider and footer buttons, and improve document metadata contrast. Keep the shared two-tab layout.

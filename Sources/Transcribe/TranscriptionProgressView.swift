@@ -11,23 +11,23 @@ struct TranscriptionProgressView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(status).font(.callout.weight(.medium))
+                    Text(status).font(.body.weight(.medium))
                     Spacer()
-                    if let fraction { Text(fraction, format: .percent.precision(.fractionLength(0))).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                    if let fraction { Text(fraction, format: .percent.precision(.fractionLength(0))).font(.body.monospacedDigit()).foregroundStyle(.secondary) }
                 }
                 if let fraction { ProgressView(value: fraction).help("Progress follows decoded audio timestamps and advances as sections finish.") }
                 else { ProgressView().controlSize(.small) }
                 Text(hasSavedTranscript
                     ? "Live preview · Your saved transcript is kept until this run succeeds."
                     : "Live preview · Sections appear as they finish. Text is saved when transcription completes.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.body).foregroundStyle(.secondary)
             }.padding(.horizontal, 28).padding(.vertical, 18)
             if preview.segments.isEmpty {
                 VStack(spacing: 12) {
                     Spacer()
                     Image(systemName: "waveform").font(.system(size: 30)).foregroundStyle(.tertiary)
                     Text("Waiting for the first section…").font(.headline)
-                    Text("Loading and decoding can take a moment.").font(.callout).foregroundStyle(.secondary)
+                    Text("Loading and decoding can take a moment.").font(.body).foregroundStyle(.secondary)
                     Spacer()
                 }.frame(maxWidth: .infinity)
             } else {
@@ -36,9 +36,9 @@ struct TranscriptionProgressView: View {
                         ForEach(preview.segments) { segment in
                             HStack(alignment: .top, spacing: 20) {
                                 Text(Transcript.timestamp(segment.start))
-                                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                                    .frame(width: 50, alignment: .leading).padding(.top, 4)
-                                Text(segment.text).font(.system(size: 15)).lineSpacing(5)
+                                    .font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
+                                    .frame(width: 64, alignment: .leading).padding(.top, 4)
+                                Text(segment.text).font(.system(size: 16)).lineSpacing(5)
                                     .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                             }
                         }
