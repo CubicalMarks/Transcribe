@@ -11,7 +11,7 @@ make check
 open dist/Transcribe.app
 ```
 
-`make build` creates an arm64 release app with an icon, microphone permission metadata, dependency notices and an ad-hoc signature. `make run` builds and opens it. This is a local build, not a Developer ID signed/notarized distribution.
+`make build` creates an arm64 release app with an icon, microphone permission metadata, dependency notices and an ad-hoc signature. It signs a fresh bundle and swaps it into `dist/Transcribe.app`, preserving the previous bundle in `.build/app-stage.*` so an open app's executable is never overwritten. Reopen the app to use the new build. `make run` builds and opens it. This is a local build, not a Developer ID signed/notarized distribution.
 
 ## Usage
 
@@ -49,7 +49,7 @@ Projects/<UUID>/transcript.json     Text, names and alignment evidence
 Models/                            Weights, tokenizer and installation records
 ```
 
-**Show Local Library** in the app menu opens projects; **Models → Show Local Storage** opens the parent folder. Audio is saved before inference. Audio is never uploaded. On-device summaries keep transcript text on the Mac; ChatGPT plan summaries send transcript text to OpenAI, and API summaries send it to the endpoint you configure, only when you choose Summarise. ChatGPT sign-in/model discovery makes account requests but does not send transcripts. Plan summaries use the public streaming Responses API with storage disabled and are saved only after completed inference. There is no telemetry or app subscription; the selected ChatGPT plan or API provider's usage limits, charges and data policies apply. First-time transcription model/tokenizer preparation needs internet. JSON exports omit internal alignment evidence and include any saved summary.
+**Show Local Library** in the app menu opens projects; **Models → Show Local Storage** opens the parent folder. Audio is saved before inference. Audio is never uploaded. On-device summaries keep transcript text on the Mac; ChatGPT plan summaries send transcript text to OpenAI, and API summaries send it to the endpoint you configure, only when you choose Summarise. ChatGPT sign-in/model discovery makes account requests but does not send transcripts. Plan summaries use the public streaming Responses API with storage disabled. Streamed text is accumulated across text/content/message events, finalized without duplication and saved only after completed inference; an empty terminal snapshot does not discard text already received. There is no telemetry or app subscription; the selected ChatGPT plan or API provider's usage limits, charges and data policies apply. First-time transcription model/tokenizer preparation needs internet. JSON exports omit internal alignment evidence and include any saved summary.
 
 Microphone permission is requested when you choose Record. System/call audio and live microphone transcription while recording remain outside the current scope. Saved recordings and imported files show preview sections while being transcribed. Recordings are unencrypted local files. Private audio, transcripts, weights and exports must stay out of Git; build output and named local-data directories are ignored, but exports elsewhere need care before staging.
 

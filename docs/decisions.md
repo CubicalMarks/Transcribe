@@ -99,3 +99,18 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Replace the idle empty state with loading/decoding status and preview text. Show percentages when available, live section count and distinct speaker-identification stages. Disable transcript export while the draft is displayed.
 - Preview state never enters the saved Transcript. Publish the complete result only after successful transcription, then clear the preview before speaker identification. Cancellation/failure clears it and preserves prior saved text and edits.
 - SDK contract inspected in the pinned v1.1.1 source: https://github.com/argmaxinc/argmax-oss-swift/blob/v1.1.1/Sources/WhisperKit/Core/WhisperKit.swift and Core/TranscribeTask.swift.
+
+
+## ChatGPT stream text handling (2026-10-21)
+
+- The previous parser ignored text delta/done events and extracted notes only from response.completed.output. This can incorrectly report an empty summary when the terminal event has a compact/empty output snapshot.
+- Accumulate streamed output text by output/content position, replacing partial text with finalized text/content/message events instead of appending duplicates. Use a nonempty terminal assistant-text snapshot when present; otherwise retain the accumulated text after confirmed completion.
+- Continue rejecting interrupted, failed, incomplete, refused and genuinely empty results. Do not collect reasoning text as notes. Bound accumulated text and include only event/item counts and a bounded request ID in empty-result diagnostics, never response text or credentials.
+- The user's screenshot establishes an empty-result error after a completed response, but does not reveal the actual event sequence. Regression fixtures cover the confirmed parser gap; live account behavior remains separate validation.
+- Sources: https://developers.openai.com/api/reference/resources/responses/streaming-events and OpenAI's reference stream implementation linked from https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt (checked 2026-10-21).
+
+
+## Safe replacement of local app builds (2026-10-21)
+
+- Build and sign a fresh app bundle in a unique .build staging directory, then atomically swap it into dist. Retain the previous bundle in the staging directory so existing processes keep their mapped executable unchanged.
+- A development-host crash report showed a CODESIGNING Invalid Page termination during an in-place rebuild. Replacing the bundle avoids overwriting a running signed executable. Reopen the app to use the installed build.

@@ -151,6 +151,13 @@ private final class ChatGPTProtocol: URLProtocol, @unchecked Sendable {
         let signed = try await sign(claims(nonce: login.nonce), key: key)
         var refreshCount = 0
         var revoked = false
+        let responseEvents = [
+            #"{"type":"response.output_text.delta","item_id":"fixture-message","output_index":0,"content_index":0,"delta":"Useful "}"#,
+            #"{"type":"response.output_text.delta","item_id":"fixture-message","output_index":0,"content_index":0,"delta":"notes."}"#,
+            #"{"type":"response.output_text.done","item_id":"fixture-message","output_index":0,"content_index":0,"text":"Useful notes."}"#,
+            #"{"type":"response.completed","response":{"status":"completed","output":[]}}"#,
+        ]
+        let responseBody = Data(responseEvents.map { "data: " + $0 + "\n\n" }.joined().utf8)
         ChatGPTProtocol.handler = { request in
             switch request.url!.path {
             case "/.well-known/jwks.json": return (200, keys)
@@ -177,7 +184,7 @@ private final class ChatGPTProtocol: URLProtocol, @unchecked Sendable {
                 XCTAssertEqual(body["instructions"] as? String, "Summarise")
                 XCTAssertNil(body["max_output_tokens"])
                 XCTAssertNil(body["audio"])
-                return (200, Data(("data: {\"type\":\"response.output_text.delta\",\"delta\":\"Useful\"}\n\ndata: " + Self.completedEvent + "\n\n").utf8))
+                return (200, responseBody)
             case "/api/accounts/oauth/revoke":
                 revoked = true
                 XCTAssertTrue(String(decoding: request.httpBody!, as: UTF8.self).contains("token=synthetic-rotated"))

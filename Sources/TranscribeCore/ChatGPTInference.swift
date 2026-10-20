@@ -120,6 +120,13 @@ struct ChatGPTResponseStream {
     private var eventData: [String] = []
     private var eventBytes = 0
     private var completedText: String?
+    private struct TextPart: Hashable {
+        let output: Int
+        let content: Int
+    }
+    private var streamedParts: [TextPart: String] = [:]
+    private var streamedBytes = 0
+    private var textEventCount = 0
     private var lineBytes: [UInt8] = []
     private var previousWasCR = false
     private let requestID: String?
@@ -169,21 +176,69 @@ struct ChatGPTResponseStream {
             throw ChatGPTHTTP.error(status: 200, data: detail, requestID: requestID)
         }
         if type == "response.incomplete" { throw TranscribeError.message("ChatGPT returned an incomplete summary. The previous summary is kept.") }
-        if type == "response.completed" {
-            guard completedText == nil, let response = event["response"] as? [String: Any], response["status"] as? String == "completed",
-                  let output = response["output"] as? [[String: Any]] else { throw TranscribeError.message("ChatGPT did not confirm completed inference.") }
-            var texts: [String] = []
-            for item in output where item["type"] as? String == "message" {
-                guard item["role"] as? String == "assistant" else { continue }
-                for content in item["content"] as? [[String: Any]] ?? [] {
-                    if content["type"] as? String == "refusal" { throw TranscribeError.message("ChatGPT declined to produce a summary. The previous summary is kept.") }
-                    if content["type"] as? String == "output_text", let text = content["text"] as? String { texts.append(text) }
-                }
+        if type == "response.refusal.delta" || type == "response.refusal.done" {
+            throw TranscribeError.message("ChatGPT declined to produce a summary. The previous summary is kept.")
+        }
+        if type == "response.output_text.delta" || type == "response.output_text.done" {
+            guard completedText == nil, let text = event[type.hasSuffix(".delta") ? "delta" : "text"] as? String else {
+                throw TranscribeError.message("ChatGPT returned an invalid text stream event.")
             }
-            let text = texts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { throw TranscribeError.message("ChatGPT returned no summary text. The previous summary is kept.") }
+            textEventCount += 1
+            try store(text, output: event["output_index"] as? Int ?? 0, content: event["content_index"] as? Int ?? 0,
+                append: type.hasSuffix(".delta"))
+        }
+        if type == "response.content_part.done", let part = event["part"] as? [String: Any] {
+            if part["type"] as? String == "refusal" { throw TranscribeError.message("ChatGPT declined to produce a summary. The previous summary is kept.") }
+            if part["type"] as? String == "output_text", let text = part["text"] as? String {
+                try store(text, output: event["output_index"] as? Int ?? 0, content: event["content_index"] as? Int ?? 0)
+            }
+        }
+        if type == "response.output_item.done", let item = event["item"] as? [String: Any] {
+            for (index, text) in try assistantParts(item) {
+                try store(text, output: event["output_index"] as? Int ?? 0, content: index)
+            }
+        }
+        if type == "response.completed" {
+            guard completedText == nil, let response = event["response"] as? [String: Any], response["status"] as? String == "completed" else {
+                throw TranscribeError.message("ChatGPT did not confirm completed inference.")
+            }
+            let output = response["output"] as? [[String: Any]] ?? []
+            let finalText = try output.flatMap { try assistantParts($0).map(\.1) }.joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let streamedText = streamedParts.keys.sorted {
+                $0.output == $1.output ? $0.content < $1.content : $0.output < $1.output
+            }.compactMap { streamedParts[$0] }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            // A terminal event can be a compact snapshot. Keep the text already
+            // delivered through delta/done events, but only after confirmed completion.
+            let text = finalText.isEmpty ? streamedText : finalText
+            guard !text.isEmpty else {
+                let id = requestID.flatMap { $0.count <= 100 && $0.allSatisfy { $0.isLetter || $0.isNumber || "_-".contains($0) } ? $0 : nil }
+                throw TranscribeError.message("ChatGPT completed without summary text (\(textEventCount) text events, \(output.count) final output items). Try another available model or try again. The previous summary is kept." + (id.map { " Request ID: \($0)." } ?? ""))
+            }
             completedText = text
         }
+    }
+
+    private mutating func store(_ text: String, output: Int, content: Int, append: Bool = false) throws {
+        guard completedText == nil, output >= 0, content >= 0 else { throw TranscribeError.message("ChatGPT returned an invalid text stream position.") }
+        let key = TextPart(output: output, content: content)
+        let old = streamedParts[key] ?? ""
+        let updated = append ? old + text : text
+        streamedBytes += updated.utf8.count - old.utf8.count
+        guard streamedBytes <= 2_000_000, streamedParts.count < 4096 || streamedParts[key] != nil else {
+            throw TranscribeError.message("ChatGPT returned oversized summary text. The previous summary is kept.")
+        }
+        streamedParts[key] = updated
+    }
+
+    private func assistantParts(_ item: [String: Any]) throws -> [(Int, String)] {
+        guard item["type"] as? String == "message", item["role"] as? String == "assistant" else { return [] }
+        var texts: [(Int, String)] = []
+        for (index, part) in (item["content"] as? [[String: Any]] ?? []).enumerated() {
+            if part["type"] as? String == "refusal" { throw TranscribeError.message("ChatGPT declined to produce a summary. The previous summary is kept.") }
+            if part["type"] as? String == "output_text", let text = part["text"] as? String { texts.append((index, text)) }
+        }
+        return texts
     }
 
     mutating func result() throws -> String {

@@ -4,7 +4,9 @@ cd "$(dirname "$0")/.."
 
 swift build -c release --arch arm64 --product Transcribe
 bin_path=$(swift build -c release --arch arm64 --show-bin-path)
-app_path="$PWD/dist/Transcribe.app"
+stage_path=$(mktemp -d "$PWD/.build/app-stage.XXXXXX")
+app_path="$stage_path/Transcribe.app"
+output_path="$PWD/dist/Transcribe.app"
 mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
 cp "$bin_path/Transcribe" "$app_path/Contents/MacOS/Transcribe"
 cp resources/Info.plist "$app_path/Contents/Info.plist"
@@ -24,4 +26,6 @@ swift -module-cache-path .build/icon-cache scripts/AppIcon.swift "$PWD/.build/Ap
 iconutil -c icns .build/AppIcon.iconset -o "$app_path/Contents/Resources/AppIcon.icns"
 codesign --force --sign - --options runtime --entitlements resources/entitlements.plist "$app_path"
 codesign --verify --deep --strict "$app_path"
-printf 'Built: %s\n' "$app_path"
+swift -module-cache-path .build/icon-cache scripts/InstallApp.swift "$app_path" "$output_path"
+codesign --verify --deep --strict "$output_path"
+printf 'Built: %s\n' "$output_path"
