@@ -10,9 +10,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift.git", exact: "1.1.1"),
+        .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     ],
     targets: [
         .target(name: "TranscribeCore", dependencies: [
+            .product(name: "JWTKit", package: "jwt-kit"),
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
             .product(name: "SpeakerKit", package: "argmax-oss-swift"),
         ]),

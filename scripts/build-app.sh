@@ -11,6 +11,14 @@ cp resources/Info.plist "$app_path/Contents/Info.plist"
 cp resources/ThirdPartyNotices.md "$app_path/Contents/Resources/"
 install -m 644 .build/checkouts/argmax-oss-swift/LICENSE "$app_path/Contents/Resources/Argmax-LICENSE.txt"
 install -m 644 .build/checkouts/argmax-oss-swift/NOTICES "$app_path/Contents/Resources/Argmax-NOTICES.txt"
+for dependency in jwt-kit swift-crypto swift-certificates swift-asn1 swift-log; do
+    for notice in LICENSE LICENSE.txt NOTICE.txt; do
+        source_path=".build/checkouts/$dependency/$notice"
+        if [[ -f "$source_path" ]]; then
+            install -m 644 "$source_path" "$app_path/Contents/Resources/$dependency-$notice"
+        fi
+    done
+done
 mkdir -p .build/icon-cache
 swift -module-cache-path .build/icon-cache scripts/AppIcon.swift "$PWD/.build/AppIcon.iconset"
 iconutil -c icns .build/AppIcon.iconset -o "$app_path/Contents/Resources/AppIcon.icns"

@@ -69,3 +69,14 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Prevent requests to api.openai.com when the trimmed key is empty, while retaining optional authentication for compatible custom servers.
 - Distinguish HTTP 401 from general request/configuration failures; direct the user to check the provider's credential and API access in Settings. Do not expose provider response bodies, which may contain credentials.
 - Show per-URL Keychain item presence in Settings using metadata only, without reading its value or opening an authentication prompt. A saved key is not presented as a validated key.
+
+
+## ChatGPT plan connection (2026-10-21)
+
+- Add ChatGPT plan as a separate provider alongside On this Mac, OpenAI API and Custom API. Existing API connection fields remain intact when switching modes.
+- Direct browser OAuth: per-attempt PKCE/state/nonce, persistent UUID host ID, IPv4-loopback-only callback on an ephemeral port, five-minute deadline and cancellation. New registration uses dynamic_agent_client and Transcribe as the agent name; returning connections reuse the issued client ID. Interrupted new registrations retain their client ID for explicit retry.
+- Validate RS256 ID-token signatures with JWTKit against the issuer's JWKS, and verify issuer, audience, expiry, issued-at/not-before, nonce and returning subject. Keep new sign-in separate until verified. Identity-only consent is retained but cannot generate summaries.
+- Store separate client/subject credential records in a bundle-scoped Keychain document. Serialize refreshes, persist rotating credentials together, preserve credentials on temporary failures and clear only unusable token sets. Sign-out stops new plan requests, discovers and attempts session revocation, then clears local tokens while keeping account/client metadata. Report unconfirmed remote revocation.
+- Discover visible models for the selected account. Send only text to the public Responses endpoint with store=false, stream=true, instructions and a full input array. Omit unsupported output-token-limit fields. Require response.completed with nonempty assistant text; discard incomplete, failed, refused or interrupted output without replacing saved notes. Never switch billing paths automatically.
+- User completes browser authentication and consent. No real account credentials or private transcript are used by agent tests. Preserve the distinction between synthetic protocol validation and live account/model evidence.
+- Sources: https://developers.openai.com/siwc/token-sharing-open-source/sign-in, /profiles-and-sessions, /models-and-inference, /preview-limitations and /errors-and-recovery (checked 2026-10-21). JWTKit 5.7.1 and dependency versions are locked in Package.resolved; their license/notice files are bundled.

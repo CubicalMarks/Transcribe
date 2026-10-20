@@ -66,6 +66,14 @@ private final class MockSummaryProtocol: URLProtocol, @unchecked Sendable {
         XCTAssertEqual(selected.extraInstructions, original.extraInstructions)
         let restored = try JSONDecoder().decode(SummarySettings.self, from: JSONEncoder().encode(selected))
         XCTAssertEqual(restored.provider, .openAI)
+        selected.useProvider(.chatGPT)
+        selected.chatGPTAccountID = "fixture-registration"
+        selected.chatGPTModel = "discovered-model"
+        let chatGPT = try JSONDecoder().decode(SummarySettings.self, from: JSONEncoder().encode(selected))
+        XCTAssertEqual(chatGPT.provider, .chatGPT)
+        XCTAssertEqual(chatGPT.model, restored.model)
+        XCTAssertEqual(chatGPT.baseURL, restored.baseURL)
+        XCTAssertEqual(chatGPT.chatGPTAccountID, "fixture-registration")
     }
 
     func testLegacyProjectsLoadWithoutSummaryAndSummaryRoundTrips() throws {

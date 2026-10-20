@@ -30,14 +30,14 @@ public enum SummaryLanguage: String, Codable, CaseIterable, Sendable {
 }
 
 public enum SummaryBackend: String, Codable, CaseIterable, Sendable {
-    case onDevice, endpoint
-    public var title: String { self == .onDevice ? "On this Mac" : "API endpoint" }
+    case onDevice, endpoint, chatGPT
+    public var title: String { self == .onDevice ? "On this Mac" : self == .chatGPT ? "ChatGPT plan" : "API endpoint" }
 }
 
 public enum SummaryProvider: String, CaseIterable, Sendable {
-    case onDevice, openAI, custom
+    case onDevice, chatGPT, openAI, custom
     public var title: String {
-        switch self { case .onDevice: "On this Mac"; case .openAI: "OpenAI"; case .custom: "Custom API" }
+        switch self { case .onDevice: "On this Mac"; case .chatGPT: "ChatGPT plan"; case .openAI: "OpenAI API"; case .custom: "Custom API" }
     }
 }
 
@@ -57,10 +57,13 @@ public struct SummarySettings: Codable, Equatable, Sendable {
     public var tokenLimitParameter = TokenLimitParameter.maxTokens
     public var maximumOutputTokens: Int? = 4096
     public var apiPreset: SummaryAPIPreset?
+    public var chatGPTAccountID: String?
+    public var chatGPTModel: String?
     public init() {}
 
     public var provider: SummaryProvider {
         if backend == .onDevice { return .onDevice }
+        if backend == .chatGPT { return .chatGPT }
         return apiPreset == .openAI ? .openAI : .custom
     }
 
@@ -68,6 +71,8 @@ public struct SummarySettings: Codable, Equatable, Sendable {
         switch provider {
         case .onDevice:
             backend = .onDevice
+        case .chatGPT:
+            backend = .chatGPT
         case .openAI:
             backend = .endpoint
             apiPreset = .openAI

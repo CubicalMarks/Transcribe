@@ -49,13 +49,13 @@ public enum SummaryService {
         let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw TranscribeError.message("The model returned an empty summary. The previous summary is kept.") }
         return RecordingSummary(text: text, createdAt: Date(), sourceDigest: transcript.summarySourceDigest,
-            backend: settings.backend, model: settings.backend == .onDevice ? "Apple on-device model" : settings.model,
-            endpointHost: settings.backend == .endpoint ? try settings.completionURL().host : nil,
+            backend: settings.backend, model: settings.backend == .onDevice ? "Apple on-device model" : settings.backend == .chatGPT ? settings.chatGPTModel ?? "ChatGPT" : settings.model,
+            endpointHost: settings.backend == .endpoint ? try settings.completionURL().host : settings.backend == .chatGPT ? "api.openai.com" : nil,
             preset: settings.preset, language: settings.language, extraInstructions: settings.extraInstructions)
     }
 }
 
-private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
         // Neither transcript text nor credentials should follow a changed destination.

@@ -19,6 +19,7 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var errorMessage: String?
     var showModels = false
     var showSummary = false
+    let chatGPT = ChatGPTConnection()
     var summarySettings = SummarySettings() {
         didSet {
             if let data = try? JSONEncoder().encode(summarySettings) {
@@ -241,6 +242,12 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
             if settings.backend == .onDevice {
                 if let reason = OnDeviceSummaryGenerator.unavailableReason { throw TranscribeError.message(reason) }
                 generator = OnDeviceSummaryGenerator()
+            } else if settings.backend == .chatGPT {
+                guard !chatGPT.busy else { throw TranscribeError.message("Finish connecting or signing out of ChatGPT before summarising.") }
+                guard let id = settings.chatGPTAccountID, let model = settings.chatGPTModel, !model.isEmpty else {
+                    throw TranscribeError.message("Connect your ChatGPT account and choose a model in Settings first.")
+                }
+                generator = ChatGPTSummaryGenerator(client: chatGPT.client, accountID: id, model: model)
             } else {
                 _ = try settings.completionURL()
                 generator = EndpointSummaryGenerator(settings: settings, apiKey: try SummaryKeychain.read(settings))
@@ -437,6 +444,7 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     }
 
     func prepareToQuit() async -> Bool {
+        chatGPT.cancel()
         stopRecording(transcribeAfter: false)
         task?.cancel()
         await task?.value

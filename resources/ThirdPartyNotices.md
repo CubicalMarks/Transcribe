@@ -17,3 +17,17 @@ https://creativecommons.org/licenses/by/4.0/
 Model weights are downloaded separately by the user and are not bundled into this application. Keep model attribution and applicable notices with any redistribution. No Hugging Face login or acceptance is automated by this app; download failures are shown to the user.
 
 The app contains no analytics. Audio inference runs locally. Model/tokenizer preparation downloads files; optional API summarisation sends transcript text to the user-configured endpoint. On-device summarisation uses the macOS Foundation Models framework and Apple Intelligence model.
+
+
+ChatGPT account identity verification uses JWTKit (MIT), with Apple Swift Crypto,
+Swift Certificates, Swift ASN.1 and Swift Log (Apache 2.0 with Swift Runtime Library
+Exception where specified). Full LICENSE and NOTICE texts are bundled in Resources.
+https://github.com/vapor/jwt-kit
+https://github.com/apple/swift-crypto
+https://github.com/apple/swift-certificates
+https://github.com/apple/swift-asn1
+https://github.com/apple/swift-log
+
+ChatGPT plan summarisation sends only transcript text to OpenAI after the user
+connects their account and selects that provider. Sign-in uses the system browser;
+OAuth credentials are stored in macOS Keychain separately from API keys.

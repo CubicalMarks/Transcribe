@@ -10,12 +10,14 @@ struct SummaryView: View {
         if model.summarySettings.backend == .onDevice {
             return OnDeviceSummaryGenerator.unavailableReason == nil ? "On this Mac" : "On-device model unavailable"
         }
+        if model.summarySettings.backend == .chatGPT { return "Using ChatGPT plan · text sent to OpenAI" }
         guard let host = try? model.summarySettings.completionURL().host else { return "Choose a provider in Settings" }
         return "Text sent to \(model.summarySettings.provider == .openAI ? "OpenAI" : host)"
     }
 
     private var providerReady: Bool {
         if model.summarySettings.backend == .onDevice { return OnDeviceSummaryGenerator.unavailableReason == nil }
+        if model.summarySettings.backend == .chatGPT { return !model.chatGPT.busy && model.summarySettings.chatGPTAccountID != nil && model.summarySettings.chatGPTModel?.isEmpty == false }
         return (try? model.summarySettings.completionURL()) != nil
     }
 
@@ -100,6 +102,9 @@ struct SummarySettingsView: View {
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 }
+                if draft.backend == .chatGPT {
+                    chatGPTSettings
+                }
                 if draft.backend == .endpoint {
                     Section {
                         if draft.provider == .custom {
@@ -130,6 +135,20 @@ struct SummarySettingsView: View {
                     }
                 }
             }.formStyle(.grouped).disabled(model.locked)
+                .onChange(of: draft.backend) { _, backend in
+                    if backend == .chatGPT { model.chatGPT.loadModels(accountID: draft.chatGPTAccountID) }
+                }
+                .onChange(of: model.chatGPT.connectedAccountID) { _, id in
+                    if let id { draft.chatGPTAccountID = id; model.chatGPT.loadModels(accountID: id) }
+                }
+                .onChange(of: draft.chatGPTAccountID) { _, id in
+                    model.chatGPT.loadModels(accountID: id)
+                }
+                .onChange(of: model.chatGPT.modelsAccountID) { _, id in
+                    if id == draft.chatGPTAccountID, !model.chatGPT.models.contains(where: { $0.slug == draft.chatGPTModel }) {
+                        draft.chatGPTModel = model.chatGPT.models.first?.slug
+                    }
+                }
                 .onChange(of: draft.baseURL) { _, _ in apiKey = ""; removeSavedKey = false; refreshKeyStatus() }
                 .onChange(of: draft.model) { _, _ in refreshKeyStatus() }
             if let message { Text(message).font(.caption).foregroundStyle(.red).padding(.horizontal, 24).padding(.bottom, 12) }
@@ -138,11 +157,61 @@ struct SummarySettingsView: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save Changes", action: save).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(model.locked)
+                Button("Cancel") { model.chatGPT.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Save Changes", action: save).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(model.locked || model.chatGPT.busy)
             }.padding(20)
-        }.frame(width: 570, height: 550)
+        }.frame(width: 570, height: 610)
+            .task { await model.chatGPT.load(); if draft.backend == .chatGPT { model.chatGPT.loadModels(accountID: draft.chatGPTAccountID) } }
+            .onDisappear { model.chatGPT.cancel() }
             .onAppear { draft = model.summarySettings; apiKey = ""; removeSavedKey = false; message = nil; refreshKeyStatus() }
+    }
+
+    @ViewBuilder private var chatGPTSettings: some View {
+        Section {
+            Picker("Account", selection: $draft.chatGPTAccountID) {
+                Text("Choose an account").tag(String?.none)
+                ForEach(model.chatGPT.accounts) { account in
+                    Text(account.displayName + (account.tokens == nil ? " (signed out)" : "")).tag(Optional(account.id))
+                }
+            }.disabled(model.chatGPT.busy)
+            if let account = model.chatGPT.accounts.first(where: { $0.id == draft.chatGPTAccountID }) {
+                Text(account.tokens == nil ? "Signed out" : account.planEnabled ? "ChatGPT plan usage enabled" : "ChatGPT plan usage not enabled")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button(account.planEnabled || account.tokens == nil ? "Reconnect" : "Enable plan usage") { model.chatGPT.connect(accountID: account.id) }
+                    if account.tokens != nil { Button("Sign Out") { model.chatGPT.signOut(account.id) } }
+                }.disabled(model.chatGPT.busy)
+            }
+            if model.chatGPT.busy {
+                HStack {
+                    ProgressView().controlSize(.small)
+                    if model.chatGPT.signingIn { Button("Cancel Sign-in", action: model.chatGPT.cancel) }
+                }
+            } else {
+                Button("Continue with ChatGPT") { model.chatGPT.connect(accountID: nil) }
+                    .help("Connect another ChatGPT account or workspace.")
+                if model.chatGPT.pendingClientID != nil {
+                    Button("Retry Previous Sign-in") { model.chatGPT.connect(accountID: nil, retryPending: true) }
+                        .help("Reuse the previous registration after an interrupted code exchange.")
+                }
+            }
+            if let message = model.chatGPT.message { Text(message).font(.caption).foregroundStyle(.secondary) }
+        } footer: {
+            Text("Connect an eligible ChatGPT Plus or Pro plan. Account connections are saved when sign-in finishes; Save Changes applies your provider and model choice.")
+        }
+        Section {
+            if model.chatGPT.modelsAccountID == draft.chatGPTAccountID, !model.chatGPT.models.isEmpty {
+                Picker("Model", selection: $draft.chatGPTModel) {
+                    ForEach(model.chatGPT.models) { Text($0.display_name).tag(Optional($0.slug)) }
+                }
+            } else { Text("Connect an account with plan usage enabled to choose a model.").font(.callout).foregroundStyle(.secondary) }
+            Button("Refresh Models") { model.chatGPT.loadModels(accountID: draft.chatGPTAccountID) }.disabled(model.chatGPT.busy)
+        }
+        Section {
+            Link("Manage ChatGPT Usage", destination: URL(string: "https://chatgpt.com/settings/usage")!)
+            Text("Summaries use your existing ChatGPT plan limits or available credits. Only transcript text is sent to OpenAI; audio stays on this Mac. No automatic switch to API billing.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private func refreshKeyStatus() {
@@ -156,6 +225,15 @@ struct SummarySettingsView: View {
         do {
             var updated = model.summarySettings
             updated.backend = draft.backend
+            if draft.backend == .chatGPT {
+                guard let account = model.chatGPT.accounts.first(where: { $0.id == draft.chatGPTAccountID }), account.planEnabled,
+                      model.chatGPT.modelsAccountID == account.id,
+                      model.chatGPT.models.contains(where: { $0.slug == draft.chatGPTModel }) else {
+                    throw TranscribeError.message("Connect your ChatGPT plan and choose an available model before saving.")
+                }
+                updated.chatGPTAccountID = account.id
+                updated.chatGPTModel = draft.chatGPTModel
+            }
             if draft.backend == .endpoint {
                 _ = try draft.completionURL()
                 if removeSavedKey || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
