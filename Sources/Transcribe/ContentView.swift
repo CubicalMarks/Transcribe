@@ -4,6 +4,7 @@ import TranscribeCore
 
 struct ContentView: View {
     @Bindable var model: AppModel
+    @Environment(\.openSettings) private var openSettings
     @State private var dropTarget = false
     @State private var showNames = false
 
@@ -48,8 +49,8 @@ struct ContentView: View {
                         .buttonStyle(.plain).help("Move selected recording to Trash…")
                         .accessibilityLabel("Move selected recording to Trash")
                         .disabled(!model.canManageRecording)
-                    Button { model.showModels = true } label: { Image(systemName: "slider.horizontal.3") }
-                        .buttonStyle(.plain).help("Models and local storage")
+                    SettingsLink { Image(systemName: "slider.horizontal.3") }
+                        .buttonStyle(.plain).help("Settings: local models and summarisation")
                 }.padding(16)
             }.navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
         } detail: {
@@ -82,7 +83,13 @@ struct ContentView: View {
                 Button { model.showModels = true } label: { Label("Models", systemImage: "cpu") }
             }
         }
-        .sheet(isPresented: $model.showModels) { ModelsView(model: model) }
+        .onChange(of: model.showModels) { _, requested in
+            if requested {
+                model.settingsPage = .models
+                openSettings()
+                model.showModels = false
+            }
+        }
         .sheet(isPresented: $showNames) { speakerNames }
         .alert("Transcribe", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
@@ -123,34 +130,40 @@ struct ContentView: View {
     }
 
     private var options: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 20) {
-                Picker("Language", selection: $model.language) {
-                    Text("Automatic").tag("auto")
-                    Text("Swedish").tag("sv")
-                    Text("English").tag("en")
-                    Divider()
-                    ForEach(LocalSpeechEngine.languages.filter { !["sv", "en"].contains($0.code) }, id: \.code) { language in
-                        Text(language.name).tag(language.code)
-                    }
-                }.frame(maxWidth: 280)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) {
+                transcriptionLanguage
+                speakerOptions
                 Spacer(minLength: 0)
-                Toggle("Identify speakers", isOn: $model.identifySpeakers).toggleStyle(.switch).controlSize(.small)
             }
-            if model.identifySpeakers {
-                HStack {
-                    Text("Separate voices within this recording").font(.body).foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("Speakers", selection: $model.expectedSpeakers) {
-                        Text("Automatic").tag(0)
-                        ForEach(1...12, id: \.self) { Text("\($0)").tag($0) }
-                    }.frame(width: 165).controlSize(.regular)
-                }
+            VStack(alignment: .leading, spacing: 10) {
+                transcriptionLanguage
+                HStack(spacing: 16) { speakerOptions; Spacer(minLength: 0) }
             }
-            if model.language == "auto" {
-                Text("For mixed-language recordings, use Automatic and review language switches.")
-                    .font(.body).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var transcriptionLanguage: some View {
+        Picker("Language", selection: $model.language) {
+            Text("Automatic").tag("auto")
+            Text("Swedish").tag("sv")
+            Text("English").tag("en")
+            Divider()
+            ForEach(LocalSpeechEngine.languages.filter { !["sv", "en"].contains($0.code) }, id: \.code) { language in
+                Text(language.name).tag(language.code)
             }
+        }.frame(width: 220)
+            .help("For mixed-language recordings, use Automatic and review language switches. Choosing a language guides transcription, not translation.")
+    }
+
+    @ViewBuilder private var speakerOptions: some View {
+        Toggle("Identify speakers", isOn: $model.identifySpeakers).toggleStyle(.switch).controlSize(.small).fixedSize()
+            .help("Separate voices within this recording. Speaker labels can be renamed after transcription.")
+        if model.identifySpeakers {
+            Picker("Count", selection: $model.expectedSpeakers) {
+                Text("Automatic").tag(0)
+                ForEach(1...12, id: \.self) { Text("\($0)").tag($0) }
+            }.frame(width: 160).help("Expected number of speakers. Automatic estimates the count.")
         }
     }
 
@@ -187,8 +200,7 @@ struct ContentView: View {
                 if !model.showSummary, let preview = model.transcriptionPreview {
                     Text(preview.segments.isEmpty ? "Live preview" : "\(preview.segments.count) sections ready")
                         .font(.body).foregroundStyle(.secondary)
-                } else if model.showSummary, let summary = transcript.summary {
-                    Text(summary.preset.title).font(.body).foregroundStyle(.secondary)
+                } else if model.showSummary, transcript.summary != nil {
                     if transcript.summaryIsOutdated {
                         Label("Transcript changed", systemImage: "arrow.clockwise")
                             .font(.body).foregroundStyle(.orange)

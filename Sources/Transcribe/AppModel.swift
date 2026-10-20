@@ -19,6 +19,7 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var transcriptionPreview: TranscriptionPreview?
     var errorMessage: String?
     var showModels = false
+    var settingsPage = SettingsPage.models
     var showSummary = false
     let chatGPT = ChatGPTConnection()
     var summarySettings = SummarySettings() {

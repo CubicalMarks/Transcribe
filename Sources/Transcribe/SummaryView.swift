@@ -5,6 +5,7 @@ import TranscribeCore
 // Summary options occupy the same header position as transcription options.
 struct SummaryOptionsView: View {
     @Bindable var model: AppModel
+    @Environment(\.openSettings) private var openSettings
     @State private var showInstructions = false
 
     private var destination: String {
@@ -17,28 +18,42 @@ struct SummaryOptionsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 16) {
                 Picker("Preset", selection: $model.summarySettings.preset) {
                     ForEach(SummaryPreset.allCases, id: \.self) { Text($0.title).tag($0) }
-                }.frame(maxWidth: 280)
-                Spacer(minLength: 0)
+                }.frame(width: 230)
                 Picker("Language", selection: $model.summarySettings.language) {
                     ForEach(SummaryLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
-                }.frame(maxWidth: 230)
+                }.frame(width: 230)
+                Spacer(minLength: 0)
+                Button {
+                    model.settingsPage = .summaries
+                    openSettings()
+                } label: { Image(systemName: "gearshape") }
+                .buttonStyle(.borderless).help("Summary providers and accounts…")
+                .accessibilityLabel("Summary provider settings")
             }
-            HStack {
+            HStack(spacing: 12) {
+                Button { showInstructions.toggle() } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: showInstructions ? "chevron.down" : "chevron.right")
+                        Text("Additional instructions")
+                        if !model.summarySettings.extraInstructions.isEmpty { Image(systemName: "circle.fill").font(.system(size: 6)) }
+                    }
+                }.buttonStyle(.plain).fixedSize()
+                    .accessibilityValue(showInstructions ? "Expanded" : "Collapsed")
+                Spacer(minLength: 0)
                 Label(destination, systemImage: model.summarySettings.backend == .onDevice ? "desktopcomputer" : "network")
-                    .help(model.summarySettings.backend == .onDevice
+                    .lineLimit(1).truncationMode(.middle)
+                    .help(destination + ". " + (model.summarySettings.backend == .onDevice
                         ? OnDeviceSummaryGenerator.unavailableReason ?? "Transcript text stays on this Mac."
-                        : "Only transcript text is sent. Configure the destination in Settings.")
-                Spacer(minLength: 8)
-                SettingsLink { Text("Settings…") }.buttonStyle(.borderless)
+                        : "Only transcript text is sent. No audio is uploaded. Configure the destination in Settings."))
             }.font(.body).foregroundStyle(.secondary)
-            DisclosureGroup("Additional instructions", isExpanded: $showInstructions) {
+            if showInstructions {
                 TextField("What should the summary focus on?", text: $model.summarySettings.extraInstructions, axis: .vertical)
-                    .textFieldStyle(.roundedBorder).lineLimit(1...3).padding(.top, 6)
-            }.font(.body).foregroundStyle(.secondary)
+                    .textFieldStyle(.roundedBorder).lineLimit(1...3)
+            }
         }.onAppear { showInstructions = !model.summarySettings.extraInstructions.isEmpty }
     }
 }
@@ -64,6 +79,8 @@ struct SummaryContentView: View {
                     Text(summary.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                     Text("·")
                     Text(summary.model)
+                    Text("·")
+                    Text(summary.preset.title)
                 }.font(.body).foregroundStyle(.secondary)
                 RecordingTextField(title: "Summary", text: Binding(get: { model.selected?.summary?.text ?? "" }, set: { value in
                     model.edit { $0.summary?.text = value }
@@ -82,6 +99,7 @@ struct SummarySettingsView: View {
     @State private var showAdvanced = false
     @State private var message: String?
     @State private var keyStatus = ""
+    @State private var initialized = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -154,10 +172,15 @@ struct SummarySettingsView: View {
                 Button("Cancel") { model.chatGPT.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save Changes", action: save).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(model.locked || model.chatGPT.busy)
             }.padding(20)
-        }.frame(width: 570, height: 610)
-            .task { await model.chatGPT.load(); if draft.backend == .chatGPT { model.chatGPT.loadModels(accountID: draft.chatGPTAccountID) } }
-            .onDisappear { model.chatGPT.cancel() }
-            .onAppear { draft = model.summarySettings; apiKey = ""; removeSavedKey = false; message = nil; refreshKeyStatus() }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task {
+                guard !initialized else { return }
+                initialized = true
+                draft = model.summarySettings
+                refreshKeyStatus()
+                await model.chatGPT.load()
+                if draft.backend == .chatGPT { model.chatGPT.loadModels(accountID: draft.chatGPTAccountID) }
+            }
     }
 
     @ViewBuilder private var chatGPTSettings: some View {

@@ -48,7 +48,7 @@ import AppKit
             }
         }
         Settings {
-            SummarySettingsView(model: model)
+            SettingsView(model: model)
         }
     }
 }

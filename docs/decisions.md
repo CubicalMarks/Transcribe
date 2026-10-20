@@ -127,3 +127,11 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Add Rename and Move to Trash to each recording's context menu and the File menu, plus a selected-recording Trash button in the sidebar and Delete handling when the list has focus. Rename uses ⇧⌘R; Trash uses ⌘⌫. Keep direct title editing available.
 - Confirm deletion with the recording title and scope. Move the whole UUID project directory using macOS Trash; imported originals and shared models stay in place. Restore the project folder into Projects and reopen to recover it.
 - Block both operations while processing/recording or when edits have failed to save. Update the list only after successful disk operations. Deleting the selected recording stops playback and selects a neighbor, or returns to the empty library. Rename changes metadata without changing selection, audio, transcript or notes.
+
+
+## Compact controls and unified Settings (2026-10-21)
+
+- Group transcription language, speaker identification and expected count in one row, with a two-row fallback when needed. Move repeated language/speaker explanations into help tooltips; retain all language choices and automatic/1–12 speaker counts.
+- Group summary preset/language in the first row and extra-instruction disclosure/destination in the second. Keep endpoint disclosure visible, with full destination/help on hover. Extra instructions remain editable; saved preset metadata moves beside the summary date/model rather than duplicating the tab bar.
+- One native Settings window owns Local Models and Summarisation pages. The sidebar Settings link and ⌘, use that window; toolbar/menu Models and missing-model prompts open its Local Models page, while the summary gear opens Summarisation.
+- Local model readiness, optional speaker preparation, download/progress/cancellation, storage access and attribution remain available. Provider/account/model, credential and advanced token controls retain their existing draft Save/Cancel behavior. Initialize the provider draft once per window session so navigation between pages does not intentionally reset it; clear closed drafts on reopening. No inference, credential format or transcript-storage change.
