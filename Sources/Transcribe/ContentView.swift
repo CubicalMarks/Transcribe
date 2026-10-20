@@ -75,7 +75,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $model.showModels) { ModelsView(model: model) }
         .sheet(isPresented: $showNames) { speakerNames }
-        .sheet(isPresented: $model.showSummarySettings) { SummarySettingsView(model: model) }
         .alert("Transcribe", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
@@ -172,7 +171,7 @@ struct ContentView: View {
                 Picker("View", selection: $model.showSummary) {
                     Text("Transcript").tag(false)
                     Text("Summary").tag(true)
-                }.pickerStyle(.segmented).frame(width: 200)
+                }.pickerStyle(.segmented).labelsHidden().frame(width: 200)
                 if !transcript.segments.isEmpty, !model.showSummary {
                     Text("\(transcript.segments.count) segments").font(.caption).foregroundStyle(.tertiary)
                 }

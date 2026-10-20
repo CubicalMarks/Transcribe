@@ -19,7 +19,6 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var errorMessage: String?
     var showModels = false
     var showSummary = false
-    var showSummarySettings = false
     var summarySettings = SummarySettings() {
         didSet {
             if let data = try? JSONEncoder().encode(summarySettings) {

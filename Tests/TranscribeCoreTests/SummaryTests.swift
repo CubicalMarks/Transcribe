@@ -40,6 +40,34 @@ private final class MockSummaryProtocol: URLProtocol, @unchecked Sendable {
 }
 
 @MainActor final class SummaryTests: XCTestCase {
+    func testProviderPresetKeepsLegacyConfigurationUntilExplicitlyChanged() throws {
+        var original = SummarySettings()
+        original.backend = .endpoint
+        original.baseURL = "https://custom.example/openai/v1"
+        original.model = "existing-deployment"
+        original.preset = .actions
+        original.language = .swedish
+        original.extraInstructions = "Focus on deadlines."
+        let legacy = try JSONDecoder().decode(SummarySettings.self, from: JSONEncoder().encode(original))
+        XCTAssertNil(legacy.apiPreset)
+        XCTAssertEqual(legacy.provider, .custom)
+        XCTAssertEqual(legacy.model, "existing-deployment")
+        var selected = legacy
+        selected.useProvider(.onDevice)
+        XCTAssertEqual(selected.baseURL, legacy.baseURL)
+        selected.useProvider(.custom)
+        XCTAssertEqual(selected.model, legacy.model)
+        selected.useProvider(.openAI)
+        XCTAssertEqual(try selected.completionURL().absoluteString, "https://api.openai.com/v1/chat/completions")
+        XCTAssertEqual(selected.model, "gpt-5.4-mini")
+        XCTAssertEqual(selected.tokenLimitParameter, .maxCompletionTokens)
+        XCTAssertEqual(selected.preset, .actions)
+        XCTAssertEqual(selected.language, .swedish)
+        XCTAssertEqual(selected.extraInstructions, original.extraInstructions)
+        let restored = try JSONDecoder().decode(SummarySettings.self, from: JSONEncoder().encode(selected))
+        XCTAssertEqual(restored.provider, .openAI)
+    }
+
     func testLegacyProjectsLoadWithoutSummaryAndSummaryRoundTrips() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

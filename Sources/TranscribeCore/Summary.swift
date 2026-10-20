@@ -34,6 +34,15 @@ public enum SummaryBackend: String, Codable, CaseIterable, Sendable {
     public var title: String { self == .onDevice ? "On this Mac" : "API endpoint" }
 }
 
+public enum SummaryProvider: String, CaseIterable, Sendable {
+    case onDevice, openAI, custom
+    public var title: String {
+        switch self { case .onDevice: "On this Mac"; case .openAI: "OpenAI"; case .custom: "Custom API" }
+    }
+}
+
+public enum SummaryAPIPreset: String, Codable, Sendable { case openAI, custom }
+
 public enum TokenLimitParameter: String, Codable, CaseIterable, Sendable {
     case maxTokens = "max_tokens", maxCompletionTokens = "max_completion_tokens"
 }
@@ -47,7 +56,30 @@ public struct SummarySettings: Codable, Equatable, Sendable {
     public var model = ""
     public var tokenLimitParameter = TokenLimitParameter.maxTokens
     public var maximumOutputTokens: Int? = 4096
+    public var apiPreset: SummaryAPIPreset?
     public init() {}
+
+    public var provider: SummaryProvider {
+        if backend == .onDevice { return .onDevice }
+        return apiPreset == .openAI ? .openAI : .custom
+    }
+
+    public mutating func useProvider(_ provider: SummaryProvider) {
+        switch provider {
+        case .onDevice:
+            backend = .onDevice
+        case .openAI:
+            backend = .endpoint
+            apiPreset = .openAI
+            baseURL = "https://api.openai.com/v1"
+            model = "gpt-5.4-mini"
+            tokenLimitParameter = .maxCompletionTokens
+            maximumOutputTokens = 4096
+        case .custom:
+            backend = .endpoint
+            apiPreset = .custom
+        }
+    }
 
     public func completionURL() throws -> URL {
         guard (900...32768).contains(maximumOutputTokens ?? 4096) else {

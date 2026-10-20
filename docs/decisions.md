@@ -53,3 +53,12 @@ User requested selectable local/API summarisation, structured meeting notes by d
 - Apple API documentation: https://developer.apple.com/documentation/foundationmodels
 
 No live hosted-provider or local Apple Intelligence generation quality claim is made. The compatible HTTP path and disabled-model state were validated; see validation.md for final checks.
+
+
+## Summary settings and interface (2026-10-21)
+
+- Provider selection and API connection configuration live in the native Settings window, opened with ⌘, or the summary pane's Settings link. Models retains its own menu item without taking the Settings shortcut.
+- Summary controls focus on preset, output language and generation; optional instructions are collapsed, with a compact destination disclosure below.
+- Offer On this Mac, OpenAI and Custom API. Selecting OpenAI explicitly applies `https://api.openai.com/v1`, editable `gpt-5.4-mini`, `max_completion_tokens` and a 4096-token budget. Existing custom configurations decode as Custom API and remain unchanged until the user selects a different provider.
+- Provider settings use a draft with Save/Cancel. Save preserves the current preset/language/instructions, and blank credentials preserve an existing key for that URL. Credentials typed for one URL are cleared when changing URLs.
+- OpenAI preset sources checked: https://developers.openai.com/api/docs/models/gpt-5.4-mini and the Chat Completions reference above. This preset is an editable starting point, not a claim of live provider validation.

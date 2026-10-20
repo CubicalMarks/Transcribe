@@ -41,3 +41,10 @@ M1/8 GB performance is not established. Speaker inference retains decoded 16 kHz
 - Release app 0.2.0 passed strict ad-hoc signature verification. FoundationModels is weak-linked, preserving the macOS 15 deployment target for transcription/API summaries. Runtime behaviour on macOS 15 has not been physically tested.
 
 Hosted endpoint compatibility and summary quality still need validation with the chosen provider/model. Native generation needs Apple Intelligence enabled and ready. Both backends produce lossy summaries that require review; transcript/export preservation checks are separate from model accuracy.
+
+
+## Summary interface cleanup — 2026-10-21
+
+- `make check` passed with 13 tests, release packaging and strict ad-hoc signature verification for app 0.2.1. Added coverage verifies legacy custom settings remain intact, explicit OpenAI defaults, settings round-trip, and preservation of preset/language/instructions.
+- Visually inspected the compact summary pane and native Settings window in a separate preview bundle with a synthetic library and preference domain. Preset, language, action, collapsed instructions and destination were visible; provider/model/key and advanced options were in Settings.
+- No hosted-provider generation or real credential validation was performed by the agent for this interface change. Existing inference/quality limitations above still apply.

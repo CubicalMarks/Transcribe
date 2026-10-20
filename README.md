@@ -25,15 +25,16 @@ Cancellation keeps saved audio and the last saved transcript; controls remain bu
 
 ## Summaries
 
-Open a recording's **Summary** tab (or choose **Summarise…** below its transcript).
+Open a recording's **Summary** tab (or choose **Summarise…** below its transcript). Choose a provider under **Transcribe → Settings…** (**⌘,**); the summary pane keeps the preset, language and action together, with extra instructions behind a disclosure.
 
 - **On this Mac** uses Apple's Foundation Models on-device model. Requires macOS 26+ and Apple Intelligence enabled with its model ready. The pane explains why it is unavailable when those requirements are not met. Transcription and API summaries still work on macOS 15+.
-- **API endpoint** uses an OpenAI-compatible Chat Completions endpoint. Open **API Settings…** and enter the base URL, model identifier and optional API key. No provider is selected by default. The destination is shown beside the action. HTTPS is required remotely; HTTP is allowed for loopback servers. Redirects are rejected.
+- **OpenAI** fills in `https://api.openai.com/v1`, the `gpt-5.4-mini` model and `max_completion_tokens`. Enter your API key in Settings; the model remains editable.
+- **Custom API** uses an OpenAI-compatible Chat Completions endpoint. Enter its base URL, model identifier and optional API key in Settings. Existing custom configurations are retained when upgrading. No external provider is enabled automatically. The destination is shown in the summary pane. HTTPS is required remotely; HTTP is allowed for loopback servers. Redirects are rejected.
 - Presets: **Meeting notes** (overview, decisions, actions, open questions), **Brief overview**, and **Action items**. Owners and deadlines are included only when stated. Choose source language, English or Swedish, with optional extra instructions.
 - Long transcripts are processed in sections and their notes combined in stages. The full source is processed; generated notes remain lossy summaries and require review. If a stage fails or is cancelled, the previous saved summary remains.
 - Summary text is editable, saved with the recording, and exportable/copyable from the Summary tab. A changed transcript or speaker name marks it outdated. Regeneration asks before replacing existing summary edits.
 
-Keys live in macOS Keychain per API URL, outside project files, exports and UserDefaults. A blank key field preserves a saved credential; **Remove saved key** deletes it on Save. API URL/model and preset preferences are stored in application preferences. The default token-limit parameter is `max_tokens`; select `max_completion_tokens` when your provider/model requires it. The configurable output-token budget defaults to 4096 and also covers reasoning tokens on providers that count those against the limit. A response ending because of a token limit or refusal is rejected rather than saved as a complete summary. Endpoint support follows the standard text Chat Completions schema; provider-specific protocols are not covered.
+Keys live in macOS Keychain per API URL, outside project files, exports and UserDefaults. A blank key field preserves a saved credential; **Remove saved key** deletes it on Save. API URL/model and preset preferences are stored in application preferences. Settings → **Advanced** contains the token-limit parameter and output-token budget. Custom APIs initially use `max_tokens`; the OpenAI preset selects `max_completion_tokens`. Choose the parameter your provider/model requires. The configurable output-token budget defaults to 4096 and also covers reasoning tokens on providers that count those against the limit. A response ending because of a token limit or refusal is rejected rather than saved as a complete summary. Endpoint support follows the standard text Chat Completions schema; provider-specific protocols are not covered.
 
 ## Local data
 

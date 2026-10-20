@@ -37,10 +37,12 @@ import AppKit
                 Button("Record Microphone", action: model.startRecording).keyboardShortcut("r").disabled(model.locked)
             }
             CommandGroup(after: .appSettings) {
-                Button("Models…") { model.showModels = true }.keyboardShortcut(",")
+                Button("Models…") { model.showModels = true }
                 Button("Show Local Library") { NSWorkspace.shared.open(model.store.projects) }
-                Button("Summary API Settings…") { model.showSummarySettings = true }.disabled(model.locked)
             }
+        }
+        Settings {
+            SummarySettingsView(model: model)
         }
     }
 }
