@@ -2,7 +2,8 @@ import SwiftUI
 import AppKit
 import TranscribeCore
 
-struct SummaryView: View {
+// Summary options occupy the same header position as transcription options.
+struct SummaryOptionsView: View {
     @Bindable var model: AppModel
     @State private var showInstructions = false
 
@@ -15,67 +16,60 @@ struct SummaryView: View {
         return "Text sent to \(model.summarySettings.provider == .openAI ? "OpenAI" : host)"
     }
 
-    private var providerReady: Bool {
-        if model.summarySettings.backend == .onDevice { return OnDeviceSummaryGenerator.unavailableReason == nil }
-        if model.summarySettings.backend == .chatGPT { return !model.chatGPT.busy && model.summarySettings.chatGPTAccountID != nil && model.summarySettings.chatGPTModel?.isEmpty == false }
-        return (try? model.summarySettings.completionURL()) != nil
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 20) {
+                Picker("Preset", selection: $model.summarySettings.preset) {
+                    ForEach(SummaryPreset.allCases, id: \.self) { Text($0.title).tag($0) }
+                }.frame(maxWidth: 280)
+                Spacer(minLength: 0)
+                Picker("Language", selection: $model.summarySettings.language) {
+                    ForEach(SummaryLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
+                }.frame(maxWidth: 230)
+            }
+            HStack {
+                Label(destination, systemImage: model.summarySettings.backend == .onDevice ? "desktopcomputer" : "network")
+                    .help(model.summarySettings.backend == .onDevice
+                        ? OnDeviceSummaryGenerator.unavailableReason ?? "Transcript text stays on this Mac."
+                        : "Only transcript text is sent. Configure the destination in Settings.")
+                Spacer(minLength: 8)
+                SettingsLink { Text("Settings…") }.buttonStyle(.borderless)
+            }.font(.caption).foregroundStyle(.secondary)
+            DisclosureGroup("Additional instructions", isExpanded: $showInstructions) {
+                TextField("What should the summary focus on?", text: $model.summarySettings.extraInstructions, axis: .vertical)
+                    .textFieldStyle(.roundedBorder).lineLimit(1...3).padding(.top, 6)
+            }.font(.caption2).foregroundStyle(.secondary)
+        }.onAppear { showInstructions = !model.summarySettings.extraInstructions.isEmpty }
     }
+}
+
+// Both documents use a growing plain text field in the shared scroll area.
+struct RecordingTextField: View {
+    let title: String
+    @Binding var text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 16) {
-                    Picker("Preset", selection: $model.summarySettings.preset) {
-                        ForEach(SummaryPreset.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }.frame(maxWidth: 260)
-                    Picker("Language", selection: $model.summarySettings.language) {
-                        ForEach(SummaryLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }.frame(maxWidth: 230)
-                    Spacer(minLength: 0)
-                    Button(model.selected?.summary == nil ? "Summarise" : "Regenerate", action: model.summarise)
-                        .buttonStyle(.borderedProminent).fixedSize()
-                        .disabled(model.selected?.segments.isEmpty != false || model.saveFailed || !providerReady)
-                }
-                DisclosureGroup("Additional instructions", isExpanded: $showInstructions) {
-                    TextField("What should the summary focus on?", text: $model.summarySettings.extraInstructions, axis: .vertical)
-                        .textFieldStyle(.roundedBorder).lineLimit(1...3).padding(.top, 6)
+        TextField(title, text: $text, axis: .vertical)
+            .textFieldStyle(.plain).font(.system(size: 15)).lineSpacing(5)
+    }
+}
+
+struct SummaryContentView: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        if let summary = model.selected?.summary {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 8) {
+                    Text(summary.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                    Text("·")
+                    Text(summary.model)
                 }.font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    Label(destination, systemImage: model.summarySettings.backend == .onDevice ? "desktopcomputer" : "network")
-                        .help(model.summarySettings.backend == .onDevice
-                            ? OnDeviceSummaryGenerator.unavailableReason ?? "Transcript text stays on this Mac."
-                            : "Only transcript text is sent. Configure the destination in Settings.")
-                    Spacer()
-                    SettingsLink { Label("Settings…", systemImage: "gearshape") }.buttonStyle(.borderless)
-                }.font(.caption).foregroundStyle(.secondary)
-            }.disabled(model.locked)
-            Divider()
-            if let summary = model.selected?.summary {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("\(summary.preset.title) · \(summary.model)").font(.caption.weight(.medium))
-                        Text(summary.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute()).font(.caption2).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if model.selected?.summaryIsOutdated == true {
-                        Label("Transcript changed", systemImage: "arrow.clockwise").font(.caption).foregroundStyle(.orange)
-                    }
-                }
-                TextEditor(text: Binding(get: { model.selected?.summary?.text ?? "" }, set: { value in
+                RecordingTextField(title: "Summary", text: Binding(get: { model.selected?.summary?.text ?? "" }, set: { value in
                     model.edit { $0.summary?.text = value }
-                })).font(.system(size: 14)).scrollContentBackground(.hidden)
-                    .disabled(model.locked).accessibilityLabel("Editable summary")
-            } else {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "text.badge.star").font(.system(size: 30)).foregroundStyle(.tertiary)
-                    Text("Turn your transcript into useful notes").font(.headline)
-                    Text("Choose a preset and summarise. Your transcript is kept.").font(.callout).foregroundStyle(.secondary)
-                    Spacer()
-                }.frame(maxWidth: .infinity)
-            }
-        }.padding(.horizontal, 26).padding(.bottom, 20)
-            .onAppear { showInstructions = !model.summarySettings.extraInstructions.isEmpty }
+                })).disabled(model.locked).accessibilityLabel("Editable summary")
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 

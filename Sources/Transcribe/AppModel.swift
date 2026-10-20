@@ -47,6 +47,14 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var selected: Transcript? { projects.first { $0.id == selectedID } }
     var locked: Bool { isBusy || isRecording }
     var modelsReady: Bool { transcriptionReady && (!identifySpeakers || speakersReady) }
+    var summaryProviderReady: Bool {
+        switch summarySettings.backend {
+        case .onDevice: OnDeviceSummaryGenerator.unavailableReason == nil
+        case .chatGPT: !chatGPT.busy && summarySettings.chatGPTAccountID != nil && summarySettings.chatGPTModel?.isEmpty == false
+        case .endpoint: (try? summarySettings.completionURL()) != nil
+        }
+    }
+
 
     override init() {
         do {

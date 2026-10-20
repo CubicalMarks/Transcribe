@@ -164,7 +164,10 @@ struct ContentView: View {
                         .padding(.horizontal, 10).padding(.vertical, 6).background(.quaternary, in: Capsule())
                 }
                 playback
-                if !model.showSummary { options.disabled(model.locked) }
+                Group {
+                    if model.showSummary { SummaryOptionsView(model: model) }
+                    else { options }
+                }.disabled(model.locked)
             }.padding(26)
             Divider()
             HStack {
@@ -172,7 +175,14 @@ struct ContentView: View {
                     Text("Transcript").tag(false)
                     Text("Summary").tag(true)
                 }.pickerStyle(.segmented).labelsHidden().frame(width: 200)
-                if !transcript.segments.isEmpty, !model.showSummary {
+                if model.showSummary, let summary = transcript.summary {
+                    Text(summary.preset.title).font(.caption).foregroundStyle(.tertiary)
+                    if transcript.summaryIsOutdated {
+                        Label("Transcript changed", systemImage: "arrow.clockwise")
+                            .font(.caption).foregroundStyle(.orange)
+                            .help("Review or regenerate the summary after editing the transcript.")
+                    }
+                } else if !transcript.segments.isEmpty, !model.showSummary {
                     Text("\(transcript.segments.count) segments").font(.caption).foregroundStyle(.tertiary)
                 }
                 Spacer()
@@ -196,31 +206,53 @@ struct ContentView: View {
                     .menuStyle(.borderlessButton).fixedSize()
                 }
             }.padding(.horizontal, 26).padding(.vertical, 14)
-            if model.showSummary {
-                SummaryView(model: model)
-            } else if transcript.segments.isEmpty {
-                VStack(spacing: 16) {
-                    Spacer()
-                    Image(systemName: "text.bubble").font(.system(size: 36)).foregroundStyle(.tertiary)
-                    Text("Ready when you are").font(.title3.weight(.medium))
-                    Text("Your audio is saved. Choose a language and transcribe.").font(.callout).foregroundStyle(.secondary)
-                    Button("Transcribe", action: model.transcribe).buttonStyle(.borderedProminent).controlSize(.large).disabled(model.locked)
-                    Spacer()
-                }.frame(maxWidth: .infinity)
+            if model.showSummary ? transcript.summary == nil : transcript.segments.isEmpty {
+                documentEmptyState(transcript)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 22) {
-                        ForEach(transcript.segments) { segment in segmentRow(segment, transcript: transcript) }
+                        if model.showSummary { SummaryContentView(model: model) }
+                        else {
+                            ForEach(transcript.segments) { segment in segmentRow(segment, transcript: transcript) }
+                        }
                     }.padding(.horizontal, 28).padding(.vertical, 18)
                 }
                 HStack {
-                    Button(transcript.speakersIdentified ? "Identify Speakers Again" : "Identify Speakers", action: model.addSpeakers)
+                    if !model.showSummary {
+                        Button(transcript.speakersIdentified ? "Identify Speakers Again" : "Identify Speakers", action: model.addSpeakers)
+                    }
                     Spacer()
-                    Button("Summarise…") { model.showSummary = true }
-                    Button("Transcribe Again…", action: model.transcribe)
+                    if model.showSummary {
+                        Button("Regenerate Summary…", action: model.summarise).disabled(!model.summaryProviderReady)
+                    } else {
+                        Button("Transcribe Again…", action: model.transcribe)
+                    }
                 }.buttonStyle(.borderless).font(.caption).padding(20).disabled(model.locked || model.saveFailed)
             }
         }
+    }
+
+    private func documentEmptyState(_ transcript: Transcript) -> some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: model.showSummary ? "text.badge.star" : "text.bubble")
+                .font(.system(size: 36)).foregroundStyle(.tertiary)
+            Text(model.showSummary ? "Ready to summarise" : "Ready when you are").font(.title3.weight(.medium))
+            Text(model.showSummary
+                ? transcript.segments.isEmpty ? "Transcribe this recording before creating a summary." : "Choose a preset and language, then summarise your transcript."
+                : "Your audio is saved. Choose a language and transcribe.")
+                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            if model.showSummary, transcript.segments.isEmpty {
+                Button("Show Transcript") { model.showSummary = false }
+                    .buttonStyle(.borderedProminent).controlSize(.large).disabled(model.locked)
+            } else {
+                Button(model.showSummary ? "Summarise" : "Transcribe") {
+                    if model.showSummary { model.summarise() } else { model.transcribe() }
+                }.buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled(model.locked || model.saveFailed || (model.showSummary && !model.summaryProviderReady))
+            }
+            Spacer()
+        }.padding(.horizontal, 28).frame(maxWidth: .infinity)
     }
 
     private func segmentRow(_ segment: TranscriptSegment, transcript: Transcript) -> some View {
@@ -250,14 +282,13 @@ struct ContentView: View {
                         }
                     }.menuStyle(.borderlessButton).fixedSize().disabled(model.locked)
                 }
-                TextField("Transcript", text: Binding(get: {
+                RecordingTextField(title: "Transcript", text: Binding(get: {
                     model.selected?.segments.first { $0.id == segment.id }?.text ?? segment.text
                 }, set: { value in
                     model.edit { item in
                         if let index = item.segments.firstIndex(where: { $0.id == segment.id }) { item.segments[index].text = value; item.textEdited = true }
                     }
-                }), axis: .vertical)
-                .textFieldStyle(.plain).font(.system(size: 15)).lineSpacing(5).disabled(model.locked)
+                })).disabled(model.locked)
                 .accessibilityLabel("Transcript at \(Transcript.timestamp(segment.start))")
             }.frame(maxWidth: .infinity, alignment: .leading)
         }

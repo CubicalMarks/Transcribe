@@ -67,3 +67,10 @@ Hosted endpoint compatibility and summary quality still need validation with the
 - Multi-event streaming exposed Foundation AsyncBytes.lines omitting empty SSE boundaries. The implementation now frames raw bytes; tests cover multi-event streaming, Swedish/emoji UTF-8, CRLF, missing completion, failure and refusal. Only nonempty assistant output from response.completed is saved.
 - Visually checked provider choices, ChatGPT account picker, Continue with ChatGPT, model placeholder and Manage Usage in a separate empty-library preview bundle with its own preferences and Keychain namespace. Cancel dismissed Settings; the preview exited cleanly. No agent-initiated real sign-in, plan consumption, private transcript upload or API-key fallback occurred.
 - Remaining live validation: the user must sign in, approve plan usage, confirm their account's actual model catalog and generate a summary. Synthetic protocol checks establish integration behavior, not account eligibility, provider admission or summary quality. Existing microphone, M1/8 GB and macOS 15 runtime limitations above remain.
+
+
+## Shared document layout — 2026-10-21
+
+- `make check` passed: source/config lint, arm64 release app 0.3.1, strict ad-hoc signature verification and all 21 existing tests. This UI change adds no model/API traffic or data-format changes.
+- An isolated preview with fictional English/Swedish segments, saved notes and silent audio showed transcript timestamp/speaker controls and the shared summary header, options placement, tab/export bar, growing text field and bottom regeneration action. The summary text scrolls in the common content area.
+- The user began interacting with the preview's Settings; agent editing/export interaction checks were left unfinished to avoid interfering with their draft. Existing deterministic tests cover transcript/summary storage and exports, but this is not a claim of a completed manual editing round-trip in the new UI. No real account credentials or private transcript were used by agent validation.

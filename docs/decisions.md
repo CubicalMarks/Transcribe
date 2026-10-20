@@ -80,3 +80,12 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Discover visible models for the selected account. Send only text to the public Responses endpoint with store=false, stream=true, instructions and a full input array. Omit unsupported output-token-limit fields. Require response.completed with nonempty assistant text; discard incomplete, failed, refused or interrupted output without replacing saved notes. Never switch billing paths automatically.
 - User completes browser authentication and consent. No real account credentials or private transcript are used by agent tests. Preserve the distinction between synthetic protocol validation and live account/model evidence.
 - Sources: https://developers.openai.com/siwc/token-sharing-open-source/sign-in, /profiles-and-sessions, /models-and-inference, /preview-limitations and /errors-and-recovery (checked 2026-10-21). JWTKit 5.7.1 and dependency versions are locked in Package.resolved; their license/notice files are bundled.
+
+
+## Shared transcript and summary layout (2026-10-21)
+
+- User chose to retain two tabs with a shared layout, using the transcript UI as the design baseline.
+- One recording layout owns title/metadata, playback, contextual options, the tab/export bar, scrolling content, empty states and bottom actions. Summary options move into the same header slot as transcription options.
+- Both documents use the same growing plain-text field, 15-point type, line spacing and scroll-area margins. Keep transcript timestamp/speaker controls and summary generation metadata/staleness indicators contextual.
+- Regeneration sits at the bottom like transcription reruns; first generation uses the same central empty-state action pattern. Remove the redundant Summarise shortcut under the transcript. Providers and credentials remain in native Settings.
+- Data format, engine behavior, edit persistence and export formats remain unchanged. The active tab selects its own copy/export actions; regenerated summaries still require replacement confirmation.
