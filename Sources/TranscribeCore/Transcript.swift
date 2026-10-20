@@ -31,6 +31,7 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
     public var textEdited = false
     // Engine-private alignment evidence, separate from the editable transcript.
     public var alignmentData: Data?
+    public var summary: RecordingSummary?
 
     public init(id: UUID = UUID(), title: String, audioFilename: String, duration: Double = 0) {
         self.id = id

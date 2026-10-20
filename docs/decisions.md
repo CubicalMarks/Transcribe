@@ -1,6 +1,6 @@
 # Decisions
 
-Updated: 2026-10-20
+Updated: 2026-10-21
 
 ## Agreed with the user
 
@@ -38,3 +38,18 @@ Updated: 2026-10-20
 - https://huggingface.co/argmaxinc/speakerkit-coreml
 
 Sources checked 2026-10-20. Upstream prerequisites vary across README sections and package manifests; our minimum versions above are explicit choices. Actual checks are recorded in validation.md.
+
+## Summarisation (2026-10-21)
+
+User requested selectable local/API summarisation, structured meeting notes by default, and several presets. The chosen API mode is a configurable OpenAI-compatible endpoint; no specific provider or real credentials were supplied.
+
+- Native Apple Foundation Models for on-device summaries, gated by macOS 26+ and runtime model availability. This preserves the standalone app approach and does not raise the transcription/API macOS 15 minimum.
+- Endpoint URL/model configurable; keys stored per canonical completion URL in Keychain. No automatic fallback or private transcript transmission during validation.
+- Meeting notes, brief overview and action-item presets, with optional instructions and source/English/Swedish output.
+- Byte-bounded section processing and staged reduction, without dropping the tail of long recordings. New summaries replace saved results only after successful completion.
+- Optional summary field preserves old project compatibility. Source digest tracks text/speaker/timestamp changes; summary edits do not modify the transcript.
+- URLSession uses an ephemeral session without cookies or cached credentials and refuses redirects. Provider HTTP errors are reported without echoing response bodies. Only completed nonempty text replies are saved.
+- API documentation: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
+- Apple API documentation: https://developer.apple.com/documentation/foundationmodels
+
+No live hosted-provider or local Apple Intelligence generation quality claim is made. The compatible HTTP path and disabled-model state were validated; see validation.md for final checks.

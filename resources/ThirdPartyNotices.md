@@ -16,4 +16,4 @@ https://creativecommons.org/licenses/by/4.0/
 
 Model weights are downloaded separately by the user and are not bundled into this application. Keep model attribution and applicable notices with any redistribution. No Hugging Face login or acceptance is automated by this app; download failures are shown to the user.
 
-The app contains no analytics or cloud inference client. Its network activity is for model/tokenizer preparation. Audio inference runs locally.
+The app contains no analytics. Audio inference runs locally. Model/tokenizer preparation downloads files; optional API summarisation sends transcript text to the user-configured endpoint. On-device summarisation uses the macOS Foundation Models framework and Apple Intelligence model.

@@ -14,7 +14,7 @@ struct ModelsView: View {
                     Text("Download once. Use offline afterwards.").foregroundStyle(.secondary)
                 }
             }
-            Text("Transcribe downloads models and tokenizer files from Hugging Face. Audio and transcripts stay on your Mac. The first preparation can take several minutes.")
+            Text("Transcribe downloads models and tokenizer files from Hugging Face. Audio processing stays on your Mac. Transcript text is sent only when you choose API summarisation. The first preparation can take several minutes.")
                 .font(.callout).foregroundStyle(.secondary)
             VStack(spacing: 18) {
                 modelRow("Whisper Turbo", subtitle: "Multilingual transcription · compressed 626 MB variant", ready: model.transcriptionReady)

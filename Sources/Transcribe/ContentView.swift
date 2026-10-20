@@ -75,6 +75,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $model.showModels) { ModelsView(model: model) }
         .sheet(isPresented: $showNames) { speakerNames }
+        .sheet(isPresented: $model.showSummarySettings) { SummarySettingsView(model: model) }
         .alert("Transcribe", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
@@ -160,34 +161,45 @@ struct ContentView: View {
                         }.font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Label("Local", systemImage: "lock.fill").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    Label("Audio local", systemImage: "lock.fill").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                         .padding(.horizontal, 10).padding(.vertical, 6).background(.quaternary, in: Capsule())
                 }
                 playback
-                options.disabled(model.locked)
+                if !model.showSummary { options.disabled(model.locked) }
             }.padding(26)
             Divider()
             HStack {
-                Text("TRANSCRIPT").font(.system(size: 10, weight: .semibold)).tracking(1.5).foregroundStyle(.secondary)
-                if !transcript.segments.isEmpty {
+                Picker("View", selection: $model.showSummary) {
+                    Text("Transcript").tag(false)
+                    Text("Summary").tag(true)
+                }.pickerStyle(.segmented).frame(width: 200)
+                if !transcript.segments.isEmpty, !model.showSummary {
                     Text("\(transcript.segments.count) segments").font(.caption).foregroundStyle(.tertiary)
                 }
                 Spacer()
                 if !transcript.segments.isEmpty {
-                    if transcript.speakersIdentified {
+                    if transcript.speakersIdentified, !model.showSummary {
                         Button("Speaker Names…") { showNames = true }.disabled(model.locked)
                     }
                     Menu {
-                        Button("Copy Transcript", action: model.copyTranscript)
-                        Divider()
-                        ForEach(ExportFormat.allCases, id: \.self) { format in
-                            Button("Export \(format.title)…") { model.export(format) }
+                        if model.showSummary {
+                            Button("Copy Summary", action: model.copySummary).disabled(transcript.summary == nil)
+                            ForEach(ExportFormat.allCases, id: \.self) { format in
+                                Button("Export Summary as \(format.title)…") { model.exportSummary(format) }.disabled(transcript.summary == nil)
+                            }
+                        } else {
+                            Button("Copy Transcript", action: model.copyTranscript)
+                            ForEach(ExportFormat.allCases, id: \.self) { format in
+                                Button("Export \(format.title)…") { model.export(format) }
+                            }
                         }
                     } label: { Label("Export", systemImage: "square.and.arrow.up") }
                     .menuStyle(.borderlessButton).fixedSize()
                 }
             }.padding(.horizontal, 26).padding(.vertical, 14)
-            if transcript.segments.isEmpty {
+            if model.showSummary {
+                SummaryView(model: model)
+            } else if transcript.segments.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()
                     Image(systemName: "text.bubble").font(.system(size: 36)).foregroundStyle(.tertiary)
@@ -205,6 +217,7 @@ struct ContentView: View {
                 HStack {
                     Button(transcript.speakersIdentified ? "Identify Speakers Again" : "Identify Speakers", action: model.addSpeakers)
                     Spacer()
+                    Button("Summarise…") { model.showSummary = true }
                     Button("Transcribe Again…", action: model.transcribe)
                 }.buttonStyle(.borderless).font(.caption).padding(20).disabled(model.locked || model.saveFailed)
             }

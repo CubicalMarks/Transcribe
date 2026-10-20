@@ -39,6 +39,7 @@ import AppKit
             CommandGroup(after: .appSettings) {
                 Button("Models…") { model.showModels = true }.keyboardShortcut(",")
                 Button("Show Local Library") { NSWorkspace.shared.open(model.store.projects) }
+                Button("Summary API Settings…") { model.showSummarySettings = true }.disabled(model.locked)
             }
         }
     }

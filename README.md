@@ -1,6 +1,6 @@
 # Transcribe
 
-A focused macOS app for local transcription and speaker identification. Built with SwiftUI, AVFoundation, WhisperKit and SpeakerKit. Import audio, record the microphone, review editable transcripts alongside playback, and export Markdown, plain text or JSON.
+A focused macOS app for local transcription and speaker identification. Built with SwiftUI, AVFoundation, WhisperKit and SpeakerKit. Import audio, record the microphone, review editable transcripts alongside playback, create LLM summaries, and export Markdown, plain text or JSON.
 
 ## Build and run
 
@@ -23,6 +23,18 @@ open dist/Transcribe.app
 
 Cancellation keeps saved audio and the last saved transcript; controls remain busy until the engine returns. Rerunning transcription asks before replacing edits. Rerunning speakers preserves edited text but clears names because cluster IDs may change. Labels are estimates within one recording, not recognition of named people across recordings.
 
+## Summaries
+
+Open a recording's **Summary** tab (or choose **Summarise…** below its transcript).
+
+- **On this Mac** uses Apple's Foundation Models on-device model. Requires macOS 26+ and Apple Intelligence enabled with its model ready. The pane explains why it is unavailable when those requirements are not met. Transcription and API summaries still work on macOS 15+.
+- **API endpoint** uses an OpenAI-compatible Chat Completions endpoint. Open **API Settings…** and enter the base URL, model identifier and optional API key. No provider is selected by default. The destination is shown beside the action. HTTPS is required remotely; HTTP is allowed for loopback servers. Redirects are rejected.
+- Presets: **Meeting notes** (overview, decisions, actions, open questions), **Brief overview**, and **Action items**. Owners and deadlines are included only when stated. Choose source language, English or Swedish, with optional extra instructions.
+- Long transcripts are processed in sections and their notes combined in stages. The full source is processed; generated notes remain lossy summaries and require review. If a stage fails or is cancelled, the previous saved summary remains.
+- Summary text is editable, saved with the recording, and exportable/copyable from the Summary tab. A changed transcript or speaker name marks it outdated. Regeneration asks before replacing existing summary edits.
+
+Keys live in macOS Keychain per API URL, outside project files, exports and UserDefaults. A blank key field preserves a saved credential; **Remove saved key** deletes it on Save. API URL/model and preset preferences are stored in application preferences. The default token-limit parameter is `max_tokens`; select `max_completion_tokens` when your provider/model requires it. The configurable output-token budget defaults to 4096 and also covers reasoning tokens on providers that count those against the limit. A response ending because of a token limit or refusal is rejected rather than saved as a complete summary. Endpoint support follows the standard text Chat Completions schema; provider-specific protocols are not covered.
+
 ## Local data
 
 Stored under `~/Library/Application Support/Transcribe/`:
@@ -33,7 +45,7 @@ Projects/<UUID>/transcript.json     Text, names and alignment evidence
 Models/                            Weights, tokenizer and installation records
 ```
 
-**Show Local Library** in the app menu opens projects; **Models → Show Local Storage** opens the parent folder. Audio is saved before inference. No audio or transcripts are uploaded; there is no telemetry, subscription or cloud inference. First-time model/tokenizer preparation needs internet. JSON exports omit internal alignment evidence.
+**Show Local Library** in the app menu opens projects; **Models → Show Local Storage** opens the parent folder. Audio is saved before inference. Audio is never uploaded. On-device summaries keep transcript text on the Mac; API summaries send transcript text to the endpoint you configure, only when you choose API summarisation. There is no telemetry or app subscription; API provider charges and data policies apply. First-time transcription model/tokenizer preparation needs internet. JSON exports omit internal alignment evidence and include any saved summary.
 
 Microphone permission is requested when you choose Record. System/call audio and live transcription are outside v0.1. Recordings are unencrypted local files. Private audio, transcripts, weights and exports must stay out of Git; build output and named local-data directories are ignored, but exports elsewhere need care before staging.
 
@@ -69,3 +81,12 @@ scripts/                       Build/signing, icon generation and checks
 Argmax OSS Swift is pinned at v1.1.1; Package.resolved locks dependency resolution. Only WhisperKit and SpeakerKit are linked; no server or TTS product. Transcription decodes incrementally with one worker. Speaker inference uses two workers and currently loads 16 kHz mono audio in memory. Long recordings need memory/performance validation, particularly on 8 GB M1 Macs.
 
 Read [AGENTS.md](AGENTS.md) and [decisions](docs/decisions.md) before editing. The [original proposal](docs/original-proposal.md) is preserved as context, including unverified claims. [ThirdPartyNotices](resources/ThirdPartyNotices.md) and bundled SDK license texts cover attribution.
+
+For a fixed synthetic summary smoke test (no personal audio/text):
+
+```sh
+swift run transcribe-probe --summary-demo
+swift run transcribe-probe --summary-demo --summary-api http://127.0.0.1:PORT/v1 --summary-model MODEL
+```
+
+The first command needs Apple's on-device model available. The second sends only the built-in synthetic fixture; an optional credential can be supplied via `TRANSCRIBE_SUMMARY_API_KEY`. Do not print real credentials or commit them. UI checks can use `TRANSCRIBE_LIBRARY_PATH` to point the app at a separate fixture library; use a separately identified QA bundle to isolate application preferences too.

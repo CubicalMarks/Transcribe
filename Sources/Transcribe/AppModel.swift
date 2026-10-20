@@ -18,6 +18,15 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var fraction: Double?
     var errorMessage: String?
     var showModels = false
+    var showSummary = false
+    var showSummarySettings = false
+    var summarySettings = SummarySettings() {
+        didSet {
+            if let data = try? JSONEncoder().encode(summarySettings) {
+                UserDefaults.standard.set(data, forKey: "summarySettings")
+            }
+        }
+    }
     var transcriptionReady = false
     var speakersReady = false
     var isRecording = false
@@ -40,10 +49,15 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var modelsReady: Bool { transcriptionReady && (!identifySpeakers || speakersReady) }
 
     override init() {
-        do { store = try TranscriptStore() }
+        do {
+            let override = ProcessInfo.processInfo.environment["TRANSCRIBE_LIBRARY_PATH"].map { URL(fileURLWithPath: $0) }
+            store = try TranscriptStore(root: override)
+        }
         catch { fatalError("Cannot open Transcribe's local storage: \(error.localizedDescription)") }
         engine = LocalSpeechEngine(models: store.models)
         super.init()
+        if let data = UserDefaults.standard.data(forKey: "summarySettings"),
+           let saved = try? JSONDecoder().decode(SummarySettings.self, from: data) { summarySettings = saved }
         do { projects = try store.loadAll() }
         catch { errorMessage = error.localizedDescription }
         selectedID = projects.first?.id
@@ -217,6 +231,55 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
                 count: count, progress: progress(for: id))
             try Task.checkCancellation()
             try put(result)
+        }
+    }
+
+    func summarise() {
+        guard !locked, !saveFailed, let transcript = selected, !transcript.segments.isEmpty else { return }
+        let settings = summarySettings
+        let generator: any SummaryTextGenerator
+        do {
+            if settings.backend == .onDevice {
+                if let reason = OnDeviceSummaryGenerator.unavailableReason { throw TranscribeError.message(reason) }
+                generator = OnDeviceSummaryGenerator()
+            } else {
+                _ = try settings.completionURL()
+                generator = EndpointSummaryGenerator(settings: settings, apiKey: try SummaryKeychain.read(settings))
+            }
+        } catch { errorMessage = error.localizedDescription; return }
+        if transcript.summary != nil {
+            let alert = NSAlert()
+            alert.messageText = "Replace this summary?"
+            alert.informativeText = "A successful new summary will replace this one, including any edits. The transcript is kept."
+            alert.addButton(withTitle: "Regenerate")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        showSummary = true
+        run("Starting summary…") { [self] id in
+            let result = try await SummaryService.generate(transcript: transcript, settings: settings,
+                using: generator, progress: progress(for: id))
+            try Task.checkCancellation()
+            var updated = transcript
+            updated.summary = result
+            try put(updated)
+        }
+    }
+
+    func copySummary() {
+        guard let text = selected?.summary?.text else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    func exportSummary(_ format: ExportFormat) {
+        guard let selected, let summary = selected.summary else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: format.rawValue) ?? .plainText]
+        panel.nameFieldStringValue = selected.title.replacingOccurrences(of: "/", with: "-") + " - Summary." + format.rawValue
+        if panel.runModal() == .OK, let url = panel.url {
+            do { try summary.exported(as: format).write(to: url, options: .atomic) }
+            catch { errorMessage = error.localizedDescription }
         }
     }
 
