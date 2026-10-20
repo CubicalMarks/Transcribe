@@ -153,6 +153,47 @@ private final class MockSummaryProtocol: URLProtocol, @unchecked Sendable {
         XCTAssertEqual(output, "Summary text")
     }
 
+    func testOpenAIWithoutKeyDoesNotSendTranscript() async throws {
+        var settings = SummarySettings()
+        settings.useProvider(.openAI)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockSummaryProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        MockSummaryProtocol.handler = { _ in
+            XCTFail("Missing OpenAI key must be caught before sending")
+            return (401, Data())
+        }
+        for provider in [SummaryProvider.openAI, .custom] {
+            settings.useProvider(provider)
+            let generator = EndpointSummaryGenerator(settings: settings, apiKey: "  ", session: session)
+            do { _ = try await generator.generate(instructions: "Summarise", input: "Text", maxTokens: 900); XCTFail("Must require a key") }
+            catch { XCTAssertTrue(error.localizedDescription.contains("No OpenAI API key is saved")) }
+        }
+    }
+
+    func testAuthenticationErrorPointsToProviderKeyWithoutExposingResponse() async throws {
+        var settings = SummarySettings()
+        settings.useProvider(.openAI)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockSummaryProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        MockSummaryProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-key")
+            return (401, Data(#"{"error":{"message":"private-response-detail"}}"#.utf8))
+        }
+        let generator = EndpointSummaryGenerator(settings: settings, apiKey: " synthetic-key\n", session: session)
+        do { _ = try await generator.generate(instructions: "Summarise", input: "Text", maxTokens: 900); XCTFail("Must reject authentication failure") }
+        catch {
+            XCTAssertTrue(error.localizedDescription.contains("rejected authentication (HTTP 401)"))
+            XCTAssertTrue(error.localizedDescription.contains("Settings"))
+            XCTAssertFalse(error.localizedDescription.contains("token-limit"))
+            XCTAssertFalse(error.localizedDescription.contains("synthetic-key"))
+            XCTAssertFalse(error.localizedDescription.contains("private-response-detail"))
+        }
+    }
+
     func testTruncatedAndRefusedResponsesAreRejected() async throws {
         var settings = SummarySettings()
         settings.baseURL = "https://example.com/v1"

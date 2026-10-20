@@ -71,7 +71,7 @@ public struct EndpointSummaryGenerator: SummaryTextGenerator {
 
     public init(settings: SummarySettings, apiKey: String, session: URLSession? = nil) {
         self.settings = settings
-        self.apiKey = apiKey
+        self.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if let session { self.session = session }
         else {
             let config = URLSessionConfiguration.ephemeral
@@ -84,7 +84,11 @@ public struct EndpointSummaryGenerator: SummaryTextGenerator {
     }
 
     public func generate(instructions: String, input: String, maxTokens: Int) async throws -> String {
-        var request = URLRequest(url: try settings.completionURL())
+        let url = try settings.completionURL()
+        if url.host?.lowercased() == "api.openai.com", apiKey.isEmpty {
+            throw TranscribeError.message("No OpenAI API key is saved. Open Settings (⌘,), enter your OpenAI API key and click Save Changes before summarising. No transcript was sent.")
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if !apiKey.isEmpty { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
@@ -98,6 +102,9 @@ public struct EndpointSummaryGenerator: SummaryTextGenerator {
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse else { throw TranscribeError.message("The API did not return an HTTP response.") }
+        if http.statusCode == 401 {
+            throw TranscribeError.message("\(url.host ?? "The summary API") rejected authentication (HTTP 401). Open Settings (⌘,) and check that the saved API key is valid for this provider and has API access. No summary was replaced.")
+        }
         guard (200..<300).contains(http.statusCode) else {
             throw TranscribeError.message("The summary API returned HTTP \(http.statusCode). Check its URL, model, credentials and token-limit parameter. No summary was replaced.")
         }

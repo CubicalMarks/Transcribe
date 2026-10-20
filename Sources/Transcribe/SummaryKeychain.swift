@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import LocalAuthentication
 import CryptoKit
 import TranscribeCore
 
@@ -10,6 +11,22 @@ enum SummaryKeychain {
         return [kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: "se.marcusliback.Transcribe.SummaryAPI",
                 kSecAttrAccount as String: account]
+    }
+
+    // Check existence without loading the secret or opening an authentication prompt.
+    static func hasSavedKey(_ settings: SummarySettings) throws -> Bool {
+        var query = try query(for: settings)
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = context
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else {
+            throw TranscribeError.message("Saved key status unavailable. Keychain will be checked when summarising.")
+        }
+        return true
     }
 
     static func read(_ settings: SummarySettings) throws -> String {

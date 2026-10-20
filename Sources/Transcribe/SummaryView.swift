@@ -85,6 +85,7 @@ struct SummarySettingsView: View {
     @State private var removeSavedKey = false
     @State private var showAdvanced = false
     @State private var message: String?
+    @State private var keyStatus = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -105,8 +106,9 @@ struct SummarySettingsView: View {
                             TextField("API base URL", text: $draft.baseURL, prompt: Text("https://your-provider.example/v1"))
                         }
                         TextField("Model", text: $draft.model, prompt: Text("Model identifier"))
-                        SecureField("API key", text: $apiKey, prompt: Text("Leave blank to keep saved key"))
+                        SecureField("API key", text: $apiKey, prompt: Text("Enter key, or leave blank to keep saved key"))
                             .disabled(removeSavedKey)
+                        Text(keyStatus).font(.caption).foregroundStyle(.secondary)
                     } footer: {
                         Text("The key is stored per API URL in macOS Keychain. A blank field keeps an existing key.")
                     }
@@ -128,7 +130,8 @@ struct SummarySettingsView: View {
                     }
                 }
             }.formStyle(.grouped).disabled(model.locked)
-                .onChange(of: draft.baseURL) { _, _ in apiKey = ""; removeSavedKey = false }
+                .onChange(of: draft.baseURL) { _, _ in apiKey = ""; removeSavedKey = false; refreshKeyStatus() }
+                .onChange(of: draft.model) { _, _ in refreshKeyStatus() }
             if let message { Text(message).font(.caption).foregroundStyle(.red).padding(.horizontal, 24).padding(.bottom, 12) }
             if model.locked {
                 Text("Settings can be changed when processing finishes.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 24)
@@ -139,7 +142,13 @@ struct SummarySettingsView: View {
                 Button("Save Changes", action: save).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(model.locked)
             }.padding(20)
         }.frame(width: 570, height: 550)
-            .onAppear { draft = model.summarySettings; apiKey = ""; removeSavedKey = false; message = nil }
+            .onAppear { draft = model.summarySettings; apiKey = ""; removeSavedKey = false; message = nil; refreshKeyStatus() }
+    }
+
+    private func refreshKeyStatus() {
+        guard (try? draft.completionURL()) != nil else { keyStatus = "Enter the API URL and model to check for a saved key."; return }
+        do { keyStatus = try SummaryKeychain.hasSavedKey(draft) ? "A key is saved for this API URL. Its validity is checked when summarising." : "No key is saved for this API URL." }
+        catch { keyStatus = error.localizedDescription }
     }
 
     private func save() {

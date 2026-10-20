@@ -48,3 +48,10 @@ Hosted endpoint compatibility and summary quality still need validation with the
 - `make check` passed with 13 tests, release packaging and strict ad-hoc signature verification for app 0.2.1. Added coverage verifies legacy custom settings remain intact, explicit OpenAI defaults, settings round-trip, and preservation of preset/language/instructions.
 - Visually inspected the compact summary pane and native Settings window in a separate preview bundle with a synthetic library and preference domain. Preset, language, action, collapsed instructions and destination were visible; provider/model/key and advanced options were in Settings.
 - No hosted-provider generation or real credential validation was performed by the agent for this interface change. Existing inference/quality limitations above still apply.
+
+
+## Summary authentication diagnostics — 2026-10-21
+
+- App 0.2.2: `make check` passed with 15 tests. New cases verify missing/whitespace OpenAI credentials prevent any request, including when the OpenAI URL is selected as a custom endpoint; HTTP 401 identifies authentication and Settings without exposing the key or response body. Existing compatible-request coverage checks the Bearer header.
+- Ran the actual Keychain implementation in an isolated harness with a unique synthetic endpoint account. Save, metadata-only existence lookup, read and removal passed. No existing credential was queried or changed, and no external API call was made.
+- Settings now reports saved-key presence without retrieving the secret or triggering authentication UI. Presence is not a validity test. The reported screenshot establishes HTTP 401; whether the user's credential is missing, invalid or lacks access has not been established.
