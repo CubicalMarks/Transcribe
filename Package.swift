@@ -21,5 +21,6 @@ let package = Package(
         .executableTarget(name: "Transcribe", dependencies: ["TranscribeCore"]),
         .executableTarget(name: "TranscribeProbe", dependencies: ["TranscribeCore"]),
         .testTarget(name: "TranscribeCoreTests", dependencies: ["TranscribeCore"]),
+        .testTarget(name: "TranscribeAppTests", dependencies: ["Transcribe"]),
     ]
 )

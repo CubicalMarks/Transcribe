@@ -19,7 +19,7 @@ open dist/Transcribe.app
 2. Open/drop audio, or choose **Record**. Imports are copied into the library. AVFoundation supports common M4A, AAC, MP3 and WAV files. Recording uses the default microphone and supports pause/resume. **Stop & Save** keeps audio; **Stop & Transcribe** saves it and starts processing, or opens model setup if needed.
 3. Choose **Automatic**, **Swedish**, **English**, or another supported language from the list. Automatic is the starting point for mixed recordings; language switches need review. Choosing a language guides transcription, not translation.
 4. Optionally enable **Identify speakers**, with automatic detection or an expected count. Transcription is saved before speaker identification. Speakers can also be identified later without repeating transcription.
-5. Play/scrub audio or click a timestamp. Edit text, assign an existing speaker label and rename speakers. Changes save locally. **Export** provides copy, TXT, Markdown and JSON.
+5. Play/scrub audio or click a timestamp. Edit text or assign an existing speaker label; changes save locally. Use **Speaker Names…** to edit names, then **Save Names** to apply them together; **Cancel** discards that name draft. **Export** provides copy, TXT, Markdown and JSON.
 
 Right-click a recording for **Rename…** or **Move to Trash…**. The same actions are in the File menu (**⇧⌘R** to rename, **⌘⌫** to trash); the sidebar also has a Trash button for the selected recording. Deletion asks for confirmation and moves the entire project folder, including saved audio, transcript and summary, to the Mac’s Trash. Imported source files and downloaded models remain in place. To restore, move the UUID-named project folder from Trash back into the Projects folder opened by **Show Local Library**, then reopen the app. These actions are disabled during recording/processing or while edits have not saved successfully.
 
@@ -65,7 +65,7 @@ Microphone permission is requested when you choose Record. System/call audio and
 | `make build` | Build/sign `dist/Transcribe.app` |
 | `make run` | Build and open the app |
 | `make lint` | Shell/config/package syntax and source whitespace |
-| `make test` | Preservation, storage and export tests; no model downloads |
+| `make test` | Preservation, storage, export and native-editor tests; no model downloads |
 | `make check` | Lint, release packaging and tests |
 | `make probe` | Headless inference validation command usage |
 
@@ -83,6 +83,7 @@ Sources/Transcribe/             Window, recording, playback and app lifecycle
 Sources/TranscribeCore/         Transcript/storage and inference interfaces
 Sources/TranscribeProbe/        Real-model validation command
 Tests/TranscribeCoreTests/      Deterministic preservation tests
+Tests/TranscribeAppTests/       Native editor sizing, binding and undo tests
 resources/                     Bundle metadata, entitlements and attribution
 scripts/                       Build/signing, icon generation and checks
 ```

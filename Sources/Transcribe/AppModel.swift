@@ -126,6 +126,15 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         catch { errorMessage = error.localizedDescription }
     }
 
+    func saveSpeakerNames(_ names: [String: String], for id: UUID) throws {
+        guard !locked, !saveFailed, var transcript = selected, transcript.id == id else {
+            throw TranscribeError.message("Names cannot be changed while this recording is unavailable or processing.")
+        }
+        guard transcript.speakerNames != names else { return }
+        transcript.speakerNames = names
+        try put(transcript)
+    }
+
     var canManageRecording: Bool { !locked && !saveFailed && selected != nil }
 
     func renameRecording(_ id: UUID? = nil) {

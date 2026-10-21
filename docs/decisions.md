@@ -144,3 +144,11 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Remove the universal 220-word final instruction for Meeting notes. Give this preset a 2400-token final response budget with flexible 400–700-word guidance for substantive multi-topic meetings; do not pad short conversations. Brief overview and Action items retain their 220-word/900-token final guidance.
 - Scale Meeting notes' intermediate word budget with excerpt bytes (60–600 words), with a corresponding response-token budget, instead of compressing every large excerpt to 100 words. Retain the existing provider input bounds, full-source chunking and eight-pass failure limit; this improves allowance but does not establish model quality or eliminate reduction loss.
 - Apply the shared preset through the existing local, ChatGPT and compatible API generators. Preserve source-language/output-language choice, extra instructions, saved-summary replacement rules and existing provider billing paths.
+
+
+## Long-document scrolling and name editing (2026-10-21)
+
+- Replace the shared growing SwiftUI TextField with a plain AppKit NSTextView. Keep the same 16-point text, line spacing, shared outer scroll view and existing edit/autosave binding. Cache measured text height until content or width changes; preserve caret/undo on unchanged updates and use the window's standard undo manager.
+- Isolate playback in its own observed View so playhead ticks do not invalidate the document tree. Compute available speaker IDs once for a document render rather than scanning all sections in each row, and read each row's captured text without a second full-array search.
+- Speaker names use a local sheet draft and explicit Save Names/Cancel. Apply all names with one atomic project save; publish the updated names only after successful persistence. A failed save keeps the draft available for retry. Transcript and summary text retain immediate autosave.
+- This changes neither transcript formats nor inference/model selection. Avoid an asynchronous autosave queue or debounce lifecycle for this fix; source/audio preservation continues to use the existing synchronous atomic store.

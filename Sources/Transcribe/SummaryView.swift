@@ -58,17 +58,6 @@ struct SummaryOptionsView: View {
     }
 }
 
-// Both documents use a growing plain text field in the shared scroll area.
-struct RecordingTextField: View {
-    let title: String
-    @Binding var text: String
-
-    var body: some View {
-        TextField(title, text: $text, axis: .vertical)
-            .textFieldStyle(.plain).font(.system(size: 16)).lineSpacing(5)
-    }
-}
-
 struct SummaryContentView: View {
     @Bindable var model: AppModel
 

@@ -90,7 +90,7 @@ struct ContentView: View {
                 model.showModels = false
             }
         }
-        .sheet(isPresented: $showNames) { speakerNames }
+        .sheet(isPresented: $showNames) { SpeakerNamesView(model: model) }
         .alert("Transcribe", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
@@ -168,7 +168,8 @@ struct ContentView: View {
     }
 
     private func project(_ transcript: Transcript) -> some View {
-        VStack(spacing: 0) {
+        let speakerIDs = transcript.speakerIDs
+        return VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -185,7 +186,7 @@ struct ContentView: View {
                     Label("Audio local", systemImage: "lock.fill").font(.body.weight(.medium)).foregroundStyle(.secondary)
                         .padding(.horizontal, 10).padding(.vertical, 6).background(.quaternary, in: Capsule())
                 }
-                playback
+                PlaybackView(model: model)
                 Group {
                     if model.showSummary { SummaryOptionsView(model: model) }
                     else { options }
@@ -241,7 +242,7 @@ struct ContentView: View {
                     LazyVStack(alignment: .leading, spacing: 22) {
                         if model.showSummary { SummaryContentView(model: model) }
                         else {
-                            ForEach(transcript.segments) { segment in segmentRow(segment, transcript: transcript) }
+                            ForEach(transcript.segments) { segment in segmentRow(segment, transcript: transcript, speakerIDs: speakerIDs) }
                         }
                     }.padding(.horizontal, 28).padding(.vertical, 18)
                 }
@@ -283,7 +284,7 @@ struct ContentView: View {
         }.padding(.horizontal, 28).frame(maxWidth: .infinity)
     }
 
-    private func segmentRow(_ segment: TranscriptSegment, transcript: Transcript) -> some View {
+    private func segmentRow(_ segment: TranscriptSegment, transcript: Transcript, speakerIDs: [Int]) -> some View {
         HStack(alignment: .top, spacing: 20) {
             Button { model.seek(segment.start, play: true) } label: {
                 Text(Transcript.timestamp(segment.start)).font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
@@ -291,7 +292,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 7) {
                 if transcript.speakersIdentified {
                     Menu {
-                        ForEach(transcript.speakerIDs, id: \.self) { id in
+                        ForEach(speakerIDs, id: \.self) { id in
                             Button(transcript.speakerName(id)) {
                                 model.edit { item in
                                     if let index = item.segments.firstIndex(where: { $0.id == segment.id }) { item.segments[index].speakerID = id; item.textEdited = true }
@@ -310,8 +311,8 @@ struct ContentView: View {
                         }
                     }.menuStyle(.borderlessButton).fixedSize().disabled(model.locked)
                 }
-                RecordingTextField(title: "Transcript", text: Binding(get: {
-                    model.selected?.segments.first { $0.id == segment.id }?.text ?? segment.text
+                RecordingTextField(title: "Transcript at \(Transcript.timestamp(segment.start))", text: Binding(get: {
+                    segment.text
                 }, set: { value in
                     model.edit { item in
                         if let index = item.segments.firstIndex(where: { $0.id == segment.id }) { item.segments[index].text = value; item.textEdited = true }
@@ -320,28 +321,6 @@ struct ContentView: View {
                 .accessibilityLabel("Transcript at \(Transcript.timestamp(segment.start))")
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private var playback: some View {
-        HStack(spacing: 16) {
-            Button(action: model.togglePlayback) {
-                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 16))
-                    .frame(width: 38, height: 38).background(.indigo.opacity(0.09), in: Circle())
-            }.buttonStyle(.plain).disabled(model.playerDuration <= 0).accessibilityLabel(model.isPlaying ? "Pause" : "Play")
-            VStack(spacing: 7) {
-                GeometryReader { geometry in
-                    WaveformView(values: model.waveform, progress: model.playerDuration > 0 ? model.playhead / model.playerDuration : 0)
-                        .contentShape(Rectangle())
-                        .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                            model.seek(value.location.x / max(1, geometry.size.width) * model.playerDuration)
-                        })
-                }.frame(height: 34)
-                Slider(value: Binding(get: { model.playhead }, set: { model.seek($0) }), in: 0...max(0.01, model.playerDuration))
-                    .controlSize(.regular).disabled(model.playerDuration <= 0).accessibilityLabel("Playback position")
-            }
-            Text("\(Transcript.timestamp(model.playhead)) / \(Transcript.timestamp(model.playerDuration))")
-                .font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary).frame(width: 132)
-        }.padding(14).background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var recording: some View {
@@ -381,24 +360,37 @@ struct ContentView: View {
         }.padding(.horizontal, 20).frame(minHeight: 43)
     }
 
-    private var speakerNames: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Speaker names").font(.title2.weight(.semibold))
-            Text("Names apply to this recording. Voice labels are estimates; review them against the audio.")
-                .font(.body).foregroundStyle(.secondary)
-            ForEach(model.selected?.speakerIDs ?? [], id: \.self) { id in
-                TextField("Speaker \(id + 1)", text: Binding(get: { model.selected?.speakerNames[String(id)] ?? "" }, set: { value in
-                    model.edit { $0.speakerNames[String(id)] = value }
-                })).textFieldStyle(.roundedBorder)
-            }
-            HStack { Spacer(); Button("Done") { showNames = false }.keyboardShortcut(.defaultAction) }
-        }.padding(28).frame(width: 420)
-    }
-
     private func speakerColor(_ id: Int?) -> Color {
         guard let id else { return .gray }
         return [.indigo, .teal, .orange, .pink, .purple, .blue][abs(id) % 6]
     }
+}
+
+// Playback updates ten times a second; keep their observation out of the document tree.
+struct PlaybackView: View {
+    @Bindable var model: AppModel
+    var body: some View {
+        HStack(spacing: 16) {
+            Button(action: model.togglePlayback) {
+                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 16))
+                    .frame(width: 38, height: 38).background(.indigo.opacity(0.09), in: Circle())
+            }.buttonStyle(.plain).disabled(model.playerDuration <= 0).accessibilityLabel(model.isPlaying ? "Pause" : "Play")
+            VStack(spacing: 7) {
+                GeometryReader { geometry in
+                    WaveformView(values: model.waveform, progress: model.playerDuration > 0 ? model.playhead / model.playerDuration : 0)
+                        .contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                            model.seek(value.location.x / max(1, geometry.size.width) * model.playerDuration)
+                        })
+                }.frame(height: 34)
+                Slider(value: Binding(get: { model.playhead }, set: { model.seek($0) }), in: 0...max(0.01, model.playerDuration))
+                    .controlSize(.regular).disabled(model.playerDuration <= 0).accessibilityLabel("Playback position")
+            }
+            Text("\(Transcript.timestamp(model.playhead)) / \(Transcript.timestamp(model.playerDuration))")
+                .font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary).frame(width: 132)
+        }.padding(14).background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+    }
+
 }
 
 struct WaveformView: View {
