@@ -161,3 +161,11 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Native editor sizing always answers minimum/ideal/maximum probes with finite sizes. Measure attributed text in a separate TextKit container and cache several widths; hypothetical proposals must not resize or rewrap the live editor. SwiftUI owns the editor frame; content changes invalidate only measurement, avoiding a second native intrinsic-size/window-layout cascade.
 - Scope Speaker Names presentation state to its button, and initialize the draft before presentation instead of publishing several onAppear updates through the recording view. Keep Save Names/Cancel and atomic persistence unchanged.
 - Retain the interface, native text editing, font/spacing, timestamp playback, per-section speaker menus, immediate autosave and window Undo. No data format, inference, provider, credential or audio handling changes.
+
+
+## Stable local signing for Keychain access (2026-10-21)
+
+- The user reports that Always Allow does not persist across restarts. The installed and dist 0.3.9 apps both have the same ad-hoc, cdhash-only designated requirement; matching copies rule out different installed/dist builds as the sole explanation. This does not inspect or establish the stored credential ACL state.
+- Use an existing personal Apple Development identity on this Mac. Pin its public fingerprint in a Git-ignored `.signing-identity` file; `CODE_SIGN_IDENTITY` overrides it explicitly. Other checkouts without configuration retain ad-hoc builds with a warning. Never select an arbitrary certificate, use company distribution credentials automatically, export private keys, alter credential ACLs or silently downgrade a configured signing failure.
+- Preserve the bundle identifier and normal certificate-derived designated requirement across builds. Existing credentials remain untouched, and the first certificate-signed app may need a one-time approval. Keychain storage and app authentication code are unchanged. Local signing omits a timestamp and does not claim notarization/distribution readiness.
+- Reference: https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements and Apple's Code Signing Guide, Code Signing Tasks.

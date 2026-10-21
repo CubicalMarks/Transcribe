@@ -2,6 +2,22 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Keep the chosen identity outside Git and never execute local configuration.
+if [[ ${CODE_SIGN_IDENTITY+x} ]]; then
+    signing_identity="$CODE_SIGN_IDENTITY"
+elif [[ -f .signing-identity ]]; then
+    IFS= read -r signing_identity < .signing-identity
+else
+    signing_identity="-"
+fi
+if [[ -z "$signing_identity" ]]; then
+    printf 'Signing identity is empty. Set CODE_SIGN_IDENTITY or .signing-identity.\n' >&2
+    exit 1
+fi
+if [[ "$signing_identity" == "-" ]]; then
+    printf 'Warning: ad-hoc signing cannot preserve Keychain approval across builds. Configure a certificate for regular use.\n' >&2
+fi
+
 swift build -c release --arch arm64 --product Transcribe
 bin_path=$(swift build -c release --arch arm64 --show-bin-path)
 stage_path=$(mktemp -d "$PWD/.build/app-stage.XXXXXX")
@@ -24,7 +40,7 @@ done
 mkdir -p .build/icon-cache
 swift -module-cache-path .build/icon-cache scripts/AppIcon.swift "$PWD/.build/AppIcon.iconset"
 iconutil -c icns .build/AppIcon.iconset -o "$app_path/Contents/Resources/AppIcon.icns"
-codesign --force --sign - --options runtime --entitlements resources/entitlements.plist "$app_path"
+codesign --force --sign "$signing_identity" --timestamp=none --options runtime --entitlements resources/entitlements.plist "$app_path"
 codesign --verify --deep --strict "$app_path"
 swift -module-cache-path .build/icon-cache scripts/InstallApp.swift "$app_path" "$output_path"
 codesign --verify --deep --strict "$output_path"

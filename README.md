@@ -11,7 +11,9 @@ make check
 open dist/Transcribe.app
 ```
 
-`make build` creates an arm64 release app with an icon, microphone permission metadata, dependency notices and an ad-hoc signature. It signs a fresh bundle and swaps it into `dist/Transcribe.app`, preserving the previous bundle in `.build/app-stage.*` so an open app's executable is never overwritten. Reopen the app to use the new build. `make run` builds and opens it. This is a local build, not a Developer ID signed/notarized distribution.
+`make build` creates an arm64 release app with an icon, microphone permission metadata, dependency notices and a code signature. It signs a fresh bundle and swaps it into `dist/Transcribe.app`, preserving the previous bundle in `.build/app-stage.*` so an open app's executable is never overwritten. Reopen the app to use the new build. `make run` builds and opens it. By default the signature is ad-hoc. For regular use, select an existing code-signing certificate by putting its SHA-1 fingerprint on a single line in `.signing-identity` (ignored by Git), or set `CODE_SIGN_IDENTITY` for that build. `security find-identity -v -p codesigning` lists available certificates. The environment variable takes precedence; use `CODE_SIGN_IDENTITY=-` for a disposable ad-hoc build. A configured signing failure stops the build; it never silently falls back to ad-hoc signing.
+
+Use the same certificate and bundle identifier across updates so Keychain can recognize the app. Ad-hoc builds have a hash-based identity and can repeatedly request access; Always Allow does not provide a reliable update workflow for those builds. Switching from ad-hoc to certificate signing can require approving existing credentials once. This remains a local build without notarization; a certificate signature alone does not establish distribution readiness.
 
 ## Usage
 
