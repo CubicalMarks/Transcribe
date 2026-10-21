@@ -35,6 +35,9 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
     public var summary: RecordingSummary?
     /// Legacy private backup from the removed cleanup experiment. Preserve on save; never export.
     public var beforeCleanup: [TranscriptSegment]?
+    // Private, bounded rerun recovery. Persist with the result; never export.
+    public var previousTranscription: TranscriptionSnapshot?
+    public var previousSummary: RecordingSummary?
 
     public init(id: UUID = UUID(), title: String, audioFilename: String, duration: Double = 0) {
         self.id = id
@@ -58,6 +61,8 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
             var copy = self
             copy.alignmentData = nil
             copy.beforeCleanup = nil
+            copy.previousTranscription = nil
+            copy.previousSummary = nil
             return try Self.encoder.encode(copy)
         }
         let lines = segments.map { segment in

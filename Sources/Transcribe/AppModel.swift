@@ -314,14 +314,6 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
             return
         }
         guard modelsReady else { showModels = true; return }
-        if !transcript.segments.isEmpty {
-            let alert = NSAlert()
-            alert.messageText = "Replace this transcript?"
-            alert.informativeText = "Transcribing again replaces the text and speaker labels, including your edits. The audio is kept."
-            alert.addButton(withTitle: "Transcribe Again")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
         player?.stop()
         let selectedLanguage = language == "auto" ? nil : language
         let transcriber: any TranscriptionEngine = transcriptionModel == .pianissimo ? pianissimo : engine
@@ -331,9 +323,10 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         transcriptionPreview = .init(duration: transcript.duration)
         run("Starting transcription…") { [self] id in
             let audio = try store.audioURL(transcript)
-            let result = try await transcriber.transcribe(audio: audio, transcript: transcript,
+            var result = try await transcriber.transcribe(audio: audio, transcript: transcript,
                 language: selectedLanguage, progress: progress(for: id))
             try Task.checkCancellation()
+            result.previousTranscription = transcript.segments.isEmpty ? nil : TranscriptionSnapshot(transcript)
             try put(result)
             transcriptionPreview = nil
             if includeSpeakers, !result.segments.isEmpty {
@@ -348,19 +341,12 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     func addSpeakers() {
         guard !locked, !saveFailed, let transcript = selected, !transcript.segments.isEmpty else { return }
         guard speakersReady else { identifySpeakers = true; showModels = true; return }
-        if transcript.speakersIdentified, !transcript.speakerNames.isEmpty {
-            let alert = NSAlert()
-            alert.messageText = "Identify speakers again?"
-            alert.informativeText = "Voice labels can change between runs, so speaker names will be cleared. Your edited text is kept."
-            alert.addButton(withTitle: "Identify Again")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
         let count = expectedSpeakers == 0 ? nil : expectedSpeakers
         run("Starting speaker identification…") { [self] id in
-            let result = try await engine.identifySpeakers(audio: store.audioURL(transcript), transcript: transcript,
+            var result = try await engine.identifySpeakers(audio: store.audioURL(transcript), transcript: transcript,
                 count: count, progress: progress(for: id))
             try Task.checkCancellation()
+            result.previousTranscription = TranscriptionSnapshot(transcript)
             try put(result)
         }
     }
@@ -387,23 +373,24 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         let generator: any SummaryTextGenerator
         do { generator = try textGenerator(for: settings) }
         catch { errorMessage = error.localizedDescription; return }
-        if transcript.summary != nil {
-            let alert = NSAlert()
-            alert.messageText = "Replace this summary?"
-            alert.informativeText = "A successful new summary will replace this one, including any edits. The transcript is kept."
-            alert.addButton(withTitle: "Regenerate")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
         showSummary = true
         run("Starting summary…") { [self] id in
             let result = try await SummaryService.generate(transcript: transcript, settings: settings,
                 using: generator, progress: progress(for: id))
             try Task.checkCancellation()
             var updated = transcript
+            updated.previousSummary = transcript.summary
             updated.summary = result
             try put(updated)
         }
+    }
+
+    func restorePreviousResult() {
+        guard !locked, !saveFailed, let transcript = selected else { return }
+        guard showSummary ? transcript.canRestorePreviousSummary : transcript.canRestorePreviousTranscription else { return }
+        let restored = showSummary ? transcript.restoringPreviousSummary() : transcript.restoringPreviousTranscription()
+        do { try put(restored); status = "Previous result restored." }
+        catch { errorMessage = error.localizedDescription }
     }
 
     func copySummary() {

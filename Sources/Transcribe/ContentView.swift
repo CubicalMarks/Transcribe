@@ -237,15 +237,24 @@ struct ContentView: View {
                         }
                     }.padding(.horizontal, 28).padding(.vertical, 18)
                 }
-                HStack {
-                    if !model.showSummary {
+                HStack(spacing: 16) {
+                    if model.showSummary {
+                        Button("Regenerate Summary", action: model.summarise).disabled(!model.summaryProviderReady)
+                    } else {
+                        Button("Transcribe Again", action: model.transcribe)
                         Button(transcript.speakersIdentified ? "Identify Speakers Again" : "Identify Speakers", action: model.addSpeakers)
                     }
                     Spacer()
                     if model.showSummary {
-                        Button("Regenerate Summary…", action: model.summarise).disabled(!model.summaryProviderReady)
+                        if transcript.canRestorePreviousSummary {
+                            Button("Restore Previous Summary", action: model.restorePreviousResult)
+                                .help("Restore the summary from before the last run, replacing current summary edits.")
+                        }
                     } else {
-                        Button("Transcribe Again…", action: model.transcribe)
+                        if transcript.canRestorePreviousTranscription {
+                            Button("Restore Previous Transcript", action: model.restorePreviousResult)
+                                .help("Restore text and speaker labels from before the last run, replacing current transcript edits.")
+                        }
                     }
                 }.buttonStyle(.borderless).font(.body).padding(20).disabled(model.locked || model.saveFailed)
             }
@@ -272,6 +281,13 @@ struct ContentView: View {
                     .disabled(model.locked || model.saveFailed || (model.showSummary && !model.summaryProviderReady))
             }
             Spacer()
+            if model.showSummary ? transcript.canRestorePreviousSummary : transcript.canRestorePreviousTranscription {
+                HStack {
+                    Spacer()
+                    Button(model.showSummary ? "Restore Previous Summary" : "Restore Previous Transcript", action: model.restorePreviousResult)
+                }.buttonStyle(.borderless).font(.body).padding(.bottom, 20)
+                    .disabled(model.locked || model.saveFailed)
+            }
         }.padding(.horizontal, 28).frame(maxWidth: .infinity)
     }
 
