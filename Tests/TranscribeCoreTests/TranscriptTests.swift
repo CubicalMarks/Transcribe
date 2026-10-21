@@ -48,14 +48,21 @@ final class TranscriptTests: XCTestCase {
         transcript.speakersIdentified = true
         transcript.textEdited = true
         transcript.alignmentData = Data([1, 2, 3])
+        transcript.beforeCleanup = [.init(start: 3601, end: 3604, text: "Legacy original wording", speakerID: 2)]
         try store.save(transcript)
         XCTAssertEqual(try store.loadAll(), [transcript])
+        var saved = try XCTUnwrap(store.loadAll().first)
+        saved.title = "Renamed after removing cleanup"
+        try store.save(saved)
+        XCTAssertEqual(try store.loadAll().first?.beforeCleanup, transcript.beforeCleanup)
+        XCTAssertEqual(try store.loadAll().first?.segments, transcript.segments)
         let permissions = try FileManager.default.attributesOfItem(atPath: store.folder(transcript.id).appendingPathComponent("transcript.json").path)[.posixPermissions] as? Int
         XCTAssertEqual(permissions, 0o600)
         let text = String(decoding: try transcript.exported(as: .text), as: UTF8.self)
         XCTAssertTrue(text.contains("[1:00:01] Marcus: Edited Swedish: åäö"))
         let json = try JSONDecoder().decode(Transcript.self, from: transcript.exported(as: .json))
         XCTAssertNil(json.alignmentData)
+        XCTAssertNil(json.beforeCleanup)
         XCTAssertEqual(json.segments, transcript.segments)
     }
 

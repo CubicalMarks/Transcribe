@@ -3,13 +3,6 @@ import Foundation
 public protocol SummaryTextGenerator: Sendable {
     var inputByteLimit: Int { get }
     func generate(instructions: String, input: String, maxTokens: Int) async throws -> String
-    func generateMeasured(instructions: String, input: String, maxTokens: Int) async throws -> GeneratedText
-}
-
-extension SummaryTextGenerator {
-    public func generateMeasured(instructions: String, input: String, maxTokens: Int) async throws -> GeneratedText {
-        try await GeneratedText(text: generate(instructions: instructions, input: input, maxTokens: maxTokens))
-    }
 }
 
 public enum SummaryService {
@@ -98,10 +91,6 @@ public struct EndpointSummaryGenerator: SummaryTextGenerator {
     }
 
     public func generate(instructions: String, input: String, maxTokens: Int) async throws -> String {
-        try await generateMeasured(instructions: instructions, input: input, maxTokens: maxTokens).text
-    }
-
-    public func generateMeasured(instructions: String, input: String, maxTokens: Int) async throws -> GeneratedText {
         let url = try settings.completionURL()
         if url.host?.lowercased() == "api.openai.com", apiKey.isEmpty {
             throw TranscribeError.message("No OpenAI API key is saved. Open Settings (⌘,), enter your OpenAI API key and click Save Changes before summarising. No transcript was sent.")
@@ -142,7 +131,6 @@ public struct EndpointSummaryGenerator: SummaryTextGenerator {
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TranscribeError.message("The API returned an incomplete, refused or empty summary. The previous summary is kept. Try another model or token limit.")
         }
-        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-        return GeneratedText(text: content, usage: TokenUsage.parse(object?["usage"], chatCompletions: true))
+        return content
     }
 }

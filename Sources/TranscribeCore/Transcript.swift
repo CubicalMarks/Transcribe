@@ -33,7 +33,7 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
     // Engine-private alignment evidence, separate from the editable transcript.
     public var alignmentData: Data?
     public var summary: RecordingSummary?
-    /// First pre-cleanup text, retained until explicitly restored or retranscribed.
+    /// Legacy private backup from the removed cleanup experiment. Preserve on save; never export.
     public var beforeCleanup: [TranscriptSegment]?
 
     public init(id: UUID = UUID(), title: String, audioFilename: String, duration: Double = 0) {

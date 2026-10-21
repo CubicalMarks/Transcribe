@@ -34,9 +34,6 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var status = ""
     var fraction: Double?
     var transcriptionPreview: TranscriptionPreview?
-    var cleanupEnabled = false {
-        didSet { preferences.set(cleanupEnabled, forKey: "cleanupEnabled") }
-    }
     var errorMessage: String?
     var showModels = false
     var settingsPage = SettingsPage.models
@@ -96,7 +93,6 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         engine = LocalSpeechEngine(models: store.models)
         pianissimo = PianissimoEngine(models: store.models)
         super.init()
-        cleanupEnabled = preferences.bool(forKey: "cleanupEnabled")
         if let data = preferences.data(forKey: "transcriptionPreferences"),
            let saved = try? JSONDecoder().decode(TranscriptionPreferences.self, from: data) {
             transcriptionPreferences = saved
@@ -330,13 +326,12 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         let selectedLanguage = language == "auto" ? nil : language
         let transcriber: any TranscriptionEngine = transcriptionModel == .pianissimo ? pianissimo : engine
         let includeSpeakers = identifySpeakers
-        let includeCleanup = cleanupEnabled
         let count = expectedSpeakers == 0 ? nil : expectedSpeakers
         showSummary = false
         transcriptionPreview = .init(duration: transcript.duration)
         run("Starting transcription…") { [self] id in
             let audio = try store.audioURL(transcript)
-            var result = try await transcriber.transcribe(audio: audio, transcript: transcript,
+            let result = try await transcriber.transcribe(audio: audio, transcript: transcript,
                 language: selectedLanguage, progress: progress(for: id))
             try Task.checkCancellation()
             try put(result)
@@ -346,9 +341,7 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
                     count: count, progress: progress(for: id))
                 try Task.checkCancellation()
                 try put(attributed)
-                result = attributed
             }
-            if includeCleanup { try await cleanUpSavedTranscript(result, progress: progress(for: id)) }
         }
     }
 
@@ -411,66 +404,6 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
             updated.summary = result
             try put(updated)
         }
-    }
-
-    var cleanupDestination: String {
-        switch summarySettings.backend {
-        case .onDevice: "On this Mac"
-        case .chatGPT: "ChatGPT plan · OpenAI"
-        case .endpoint: (try? summarySettings.completionURL().host) ?? "the configured API"
-        }
-    }
-
-    func cleanUpTranscript() {
-        guard !locked, !saveFailed, let transcript = selected, !transcript.segments.isEmpty else { return }
-        guard summaryProviderReady else {
-            errorMessage = "Choose an available provider in Settings → Text & AI before cleaning up a transcript."
-            return
-        }
-        run("Cleaning up transcript…") { [self] id in
-            try await cleanUpSavedTranscript(transcript, progress: progress(for: id))
-        }
-    }
-
-    private func cleanUpSavedTranscript(_ transcript: Transcript, progress: @escaping ProgressHandler) async throws {
-        try Task.checkCancellation()
-        let grouping = try TranscriptCleanup.groupFragments(in: transcript)
-        let readable = try grouping.applying(to: transcript)
-        if grouping.hasChanges { try put(readable) }
-        let generator = try textGenerator(for: summarySettings)
-        let result = try await TranscriptCleanup.generate(transcript: readable, using: generator, progress: progress)
-        try Task.checkCancellation()
-        guard let current = selected, current.id == transcript.id else {
-            throw TranscribeError.message("The selected recording changed. Cleanup was not saved.")
-        }
-        try put(result.applying(to: current))
-    }
-
-    func joinWithPrevious(_ segmentID: UUID) {
-        guard !locked, !saveFailed, let transcript = selected,
-              let index = transcript.segments.firstIndex(where: { $0.id == segmentID }), index > 0 else { return }
-        if transcript.segments[index - 1].speakerID != transcript.segments[index].speakerID {
-            let alert = NSAlert()
-            alert.messageText = "Join sections with different speaker labels?"
-            alert.informativeText = "The joined section will use \(transcript.speakerName(transcript.segments[index - 1].speakerID)). Both sections' words and the full time span are kept."
-            alert.addButton(withTitle: "Join Sections")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
-        do { try put(transcript.joiningWithPrevious(segmentID)); status = "Sections joined. Words and time span retained." }
-        catch { errorMessage = error.localizedDescription }
-    }
-
-    func restoreBeforeCleanup() {
-        guard !locked, !saveFailed, let transcript = selected, transcript.beforeCleanup != nil else { return }
-        let alert = NSAlert()
-        alert.messageText = "Restore the text from before cleanup?"
-        alert.informativeText = "This replaces current wording and section boundaries, including later text edits. Current speaker labels are kept where sections still match. Audio and saved summaries are retained."
-        alert.addButton(withTitle: "Restore Text")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do { try put(transcript.restoringBeforeCleanup()); status = "Original text restored." }
-        catch { errorMessage = error.localizedDescription }
     }
 
     func copySummary() {

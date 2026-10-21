@@ -23,26 +23,16 @@ import TranscribeCore
             transcribe-probe --summary-demo [--summary-api BASE_URL --summary-model MODEL]
             Summarises a fixed synthetic meeting. Without --summary-api, uses Apple's on-device model.
             Optional API credential: TRANSCRIBE_SUMMARY_API_KEY environment variable.
-
-            transcribe-probe --cleanup-demo --output REPORT.json
-            Cleans fixed synthetic fixtures using the app's saved ChatGPT/on-device connection.
-            Explicitly uses plan allowance when ChatGPT is selected. Reports provider token usage when supplied.
-            Does not read recordings or change provider settings. Sign with the app's configured identity for Keychain access.
             """)
             return
         }
-        let known = Set(["--audio", "--root", "--prepare", "--speakers", "--language", "--engine", "--model", "--summary-demo", "--summary-api", "--summary-model", "--cleanup-demo", "--output"])
+        let known = Set(["--audio", "--root", "--prepare", "--speakers", "--language", "--engine", "--model", "--summary-demo", "--summary-api", "--summary-model"])
         for arg in args where arg.hasPrefix("--") && !known.contains(arg) {
             throw TranscribeError.message("Unknown option: \(arg)")
         }
         func value(_ flag: String) -> String? {
             guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1), !args[index + 1].hasPrefix("--") else { return nil }
             return args[index + 1]
-        }
-        if args.contains("--cleanup-demo") {
-            guard let output = value("--output") else { throw TranscribeError.message("--output REPORT.json is required.") }
-            try await CleanupProbe.run(output: output)
-            return
         }
         if args.contains("--summary-demo") {
             var settings = SummarySettings()

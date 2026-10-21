@@ -34,7 +34,7 @@ https://huggingface.co/magnushjelm/pianissimo-sv-coreml
 https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
 https://creativecommons.org/licenses/by/4.0/
 
-The app contains no analytics. Audio inference runs locally. Model/tokenizer preparation downloads files; optional hosted summaries and transcript cleanup send transcript text to the user-selected provider after an explicit request. On-device text processing uses the macOS Foundation Models framework and Apple Intelligence model.
+The app contains no analytics. Audio inference runs locally. Model/tokenizer preparation downloads files; optional hosted summaries send transcript text to the user-selected provider after an explicit request. On-device text processing uses the macOS Foundation Models framework and Apple Intelligence model.
 
 
 ChatGPT account identity verification uses JWTKit (MIT), with Apple Swift Crypto,

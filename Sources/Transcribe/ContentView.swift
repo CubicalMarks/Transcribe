@@ -128,22 +128,9 @@ struct ContentView: View {
     }
 
     private var options: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TranscriptionOptionsLayout {
-                transcriptionLanguage
-                HStack(spacing: 16) { speakerOptions }
-            }
-            HStack(spacing: 12) {
-                Toggle("Clean up text", isOn: $model.cleanupEnabled).toggleStyle(.switch).controlSize(.small).fixedSize()
-                    .help("Automatically tidy punctuation and wording after transcription and speaker identification. The pre-cleanup text remains restorable.")
-                if model.cleanupEnabled {
-                    Label(model.summarySettings.backend == .onDevice ? "On this Mac" : "Text to \(model.cleanupDestination)",
-                          systemImage: model.summarySettings.backend == .onDevice ? "desktopcomputer" : "network")
-                        .font(.body).foregroundStyle(.secondary)
-                }
-                Button { model.settingsPage = .summaries; openSettings() } label: { Image(systemName: "gearshape") }
-                    .buttonStyle(.plain).help("Cleanup provider and model").accessibilityLabel("Cleanup settings")
-            }
+        TranscriptionOptionsLayout {
+            transcriptionLanguage
+            HStack(spacing: 16) { speakerOptions }
         }
     }
 
@@ -253,15 +240,6 @@ struct ContentView: View {
                 HStack {
                     if !model.showSummary {
                         Button(transcript.speakersIdentified ? "Identify Speakers Again" : "Identify Speakers", action: model.addSpeakers)
-                        Menu("Clean Up") {
-                            Text("Provider: \(model.cleanupDestination)")
-                            Button("Clean Up Now", action: model.cleanUpTranscript)
-                            if transcript.beforeCleanup != nil {
-                                Button("Restore Original Text…", action: model.restoreBeforeCleanup)
-                            }
-                            Divider()
-                            Button("Text & AI Settings…") { model.settingsPage = .summaries; openSettings() }
-                        }
                     }
                     Spacer()
                     if model.showSummary {
@@ -302,11 +280,7 @@ struct ContentView: View {
             Button { model.seek(segment.start, play: true) } label: {
                 Text(Transcript.timestamp(segment.start)).font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
             }.buttonStyle(.plain).frame(width: 64, alignment: .leading).padding(.top, 4)
-                .help("Play from this timestamp. Right-click to join this section with the previous one.")
-                .contextMenu {
-                    Button("Join with Previous Section…") { model.joinWithPrevious(segment.id) }
-                        .disabled(model.locked || model.saveFailed || transcript.segments.first?.id == segment.id)
-                }
+                .help("Play from this timestamp.")
             VStack(alignment: .leading, spacing: 7) {
                 if transcript.speakersIdentified {
                     Menu {
