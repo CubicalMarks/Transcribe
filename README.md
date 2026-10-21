@@ -1,6 +1,6 @@
 # Transcribe
 
-A focused macOS app for local transcription and speaker identification. Built with SwiftUI, AVFoundation, WhisperKit and SpeakerKit. Import audio, record the microphone, review editable transcripts alongside playback, create LLM summaries, and export Markdown, plain text or JSON.
+A focused macOS app for local transcription and speaker identification. Built with SwiftUI, AVFoundation, WhisperKit, FluidAudio and SpeakerKit. Import audio, record the microphone, review editable transcripts alongside playback, create LLM summaries, and export Markdown, plain text or JSON.
 
 ## Build and run
 
@@ -17,15 +17,17 @@ Use the same certificate and bundle identifier across updates so Keychain can re
 
 ## Usage
 
-1. Open **Settings → Local Models** (or the toolbar’s **Models** shortcut), then **Download & Prepare**. Downloads include compressed Whisper large-v3 Turbo, its tokenizer and optional SpeakerKit models from Hugging Face. First-time Core ML preparation can take several minutes. Prepared files are reused offline.
+1. Open **Settings → Local Models** (or the toolbar’s **Models** shortcut), choose a transcription model, then **Download & Prepare**. **Whisper Turbo** is the default for multilingual recordings; **Pianissimo Swedish (experimental)** uses a community Core ML 8-bit conversion through FluidAudio. SpeakerKit is prepared separately when **Prepare speaker identification too** is enabled. First-time Core ML preparation can take several minutes. Prepared files are reused offline.
 2. Open/drop audio, or choose **Record**. Imports are copied into the library. AVFoundation supports common M4A, AAC, MP3 and WAV files. Recording uses the default microphone and supports pause/resume. **Stop & Save** keeps audio; **Stop & Transcribe** saves it and starts processing, or opens model setup if needed.
-3. Choose **Automatic**, **Swedish**, **English**, or another supported language from the list. Automatic is the starting point for mixed recordings; language switches need review. Choosing a language guides transcription, not translation.
+3. With Whisper, choose **Automatic**, **Swedish**, **English**, or another supported language from the list. Automatic is the starting point for mixed recordings; language switches need review. Choosing a language guides transcription, not translation. Selecting Pianissimo sets and locks Swedish; select Whisper in Local Models for English or mixed recordings.
 4. Optionally enable **Identify speakers**, with automatic detection or an expected count. Transcription is saved before speaker identification. Speakers can also be identified later without repeating transcription.
 5. Play/scrub audio or click a timestamp. Edit text or assign an existing speaker label; changes save locally. Use **Speaker Names…** to edit names, then **Save Names** to apply them together; **Cancel** discards that name draft. **Export** provides copy, TXT, Markdown and JSON.
 
 Right-click a recording for **Rename…** or **Move to Trash…**. The same actions are in the File menu (**⇧⌘R** to rename, **⌘⌫** to trash); the sidebar also has a Trash button for the selected recording. Deletion asks for confirmation and moves the entire project folder, including saved audio, transcript and summary, to the Mac’s Trash. Imported source files and downloaded models remain in place. To restore, move the UUID-named project folder from Trash back into the Projects folder opened by **Show Local Library**, then reopen the app. These actions are disabled during recording/processing or while edits have not saved successfully.
 
 The recording options keep language, speaker identification and expected speaker count together; they wrap into two rows when space is tight. Hover over these controls for language and speaker guidance.
+
+The transcription model choice is saved for future runs; switching keeps existing recordings, edits and previously downloaded models. Readiness is shown for the selected model and independently for SpeakerKit. Pianissimo downloads about 632 MB from a pinned community conversion, verifies file sizes and available weight checksums, and records readiness only after loading the exact local components. Its decoder works in 15-second windows for longer audio. This is not Klang's official MLX implementation; its reported MLX speed/accuracy and phrase boosting do not carry over as validated features. Custom vocabulary is not exposed. Natural Swedish meetings, overlap and code-switching still need evaluation; Whisper remains the default.
 
 During transcription, a read-only live preview shows completed sections with timestamps. Loading the model has its own status; audio-position progress advances as decoded sections finish, then speaker identification runs as a separate stage. This is progress through the recording, not a wall-clock ETA. Transcription exports become available when the new text is saved. Cancellation or failure discards the temporary preview and keeps the last saved transcript and audio; controls remain busy until the engine returns. Rerunning transcription asks before replacing edits. Rerunning speakers preserves edited text but clears names because cluster IDs may change. Labels are estimates within one recording, not recognition of named people across recordings.
 
@@ -78,7 +80,14 @@ swift run transcribe-probe --audio /path/to/audio.m4a \
   --root /tmp/transcribe-validation --prepare --speakers --language auto
 ```
 
-`--prepare` enables model downloads; omit it to reuse installed models. `--model tiny` selects a development model. The app uses compressed Turbo. Probe output contains transcript text; use synthetic audio or an explicitly approved fixture. See [validation](docs/validation.md) for checked behavior and limits.
+`--prepare` enables model downloads; omit it to reuse installed models. `--model tiny` selects a development Whisper model. Probe output contains transcript text; use synthetic audio or an explicitly approved fixture. Test Pianissimo with a separate library:
+
+```sh
+swift run transcribe-probe --audio /path/to/synthetic-swedish.wav \
+  --root /tmp/transcribe-pianissimo --engine pianissimo --language sv --prepare --speakers
+```
+
+`--engine` defaults to `whisper`. Pianissimo requires `--language sv` and rejects `--model`; its model revision is pinned. Omit `--speakers` to test transcription alone. See [validation](docs/validation.md) for checked behavior and limits.
 
 ```text
 Sources/Transcribe/             Window, recording, playback and app lifecycle
@@ -90,7 +99,7 @@ resources/                     Bundle metadata, entitlements and attribution
 scripts/                       Build/signing, icon generation and checks
 ```
 
-Argmax OSS Swift is pinned at v1.1.1; Package.resolved locks dependency resolution. Only WhisperKit and SpeakerKit are linked; no server or TTS product. Transcription decodes incrementally with one worker. Speaker inference uses two workers and currently loads 16 kHz mono audio in memory. Long recordings need memory/performance validation, particularly on 8 GB M1 Macs.
+Argmax OSS Swift is pinned at v1.1.1; only its WhisperKit and SpeakerKit products are linked. FluidAudio is pinned at c79c4106b954f81205113c3343e5a7e59a1089b5 with TTS, FluidAudio diarization and NeMo text-processing traits disabled. Package.resolved locks dependency resolution. Both transcription engines use one worker and support bounded audio conversion for longer files. Speaker inference uses two workers and currently loads 16 kHz mono audio in memory. Long recordings need memory/performance validation, particularly on 8 GB M1 Macs.
 
 Read [AGENTS.md](AGENTS.md) and [decisions](docs/decisions.md) before editing. The [original proposal](docs/original-proposal.md) is preserved as context, including unverified claims. [ThirdPartyNotices](resources/ThirdPartyNotices.md) and bundled SDK license texts cover attribution.
 

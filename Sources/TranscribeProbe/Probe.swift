@@ -14,10 +14,11 @@ import TranscribeCore
         let args = Array(CommandLine.arguments.dropFirst())
         if args.contains("--help") || args.isEmpty {
             print("""
-            transcribe-probe --audio FILE --root DIRECTORY [--prepare] [--speakers] [--language sv|en|auto] [--model MODEL]
+            transcribe-probe --audio FILE --root DIRECTORY [--prepare] [--speakers] [--language sv|en|auto] [--engine whisper|pianissimo] [--model WHISPER_MODEL]
             Uses a separate local library/cache under DIRECTORY. --prepare explicitly enables model downloads.
             Without --prepare, models must already be installed. Audio/transcripts are never uploaded.
-            The tiny model is for development only; the app uses compressed large-v3 Turbo.
+            Default: Whisper Turbo. Pianissimo requires --language sv; --model applies only to Whisper.
+            The tiny Whisper model is for development only.
 
             transcribe-probe --summary-demo [--summary-api BASE_URL --summary-model MODEL]
             Summarises a fixed synthetic meeting. Without --summary-api, uses Apple's on-device model.
@@ -25,7 +26,7 @@ import TranscribeCore
             """)
             return
         }
-        let known = Set(["--audio", "--root", "--prepare", "--speakers", "--language", "--model", "--summary-demo", "--summary-api", "--summary-model"])
+        let known = Set(["--audio", "--root", "--prepare", "--speakers", "--language", "--engine", "--model", "--summary-demo", "--summary-api", "--summary-model"])
         for arg in args where arg.hasPrefix("--") && !known.contains(arg) {
             throw TranscribeError.message("Unknown option: \(arg)")
         }
@@ -64,6 +65,15 @@ import TranscribeCore
         }
         let store = try TranscriptStore(root: URL(fileURLWithPath: rootPath))
         let engine = LocalSpeechEngine(models: store.models, model: value("--model") ?? LocalSpeechEngine.defaultModel)
+        let engineName = value("--engine") ?? "whisper"
+        guard ["whisper", "pianissimo"].contains(engineName), engineName != "pianissimo" || value("--model") == nil else {
+            throw TranscribeError.message("Choose --engine whisper or pianissimo. --model applies only to Whisper.")
+        }
+        let pianissimo = PianissimoEngine(models: store.models)
+        if engineName == "pianissimo", selectedLanguage != "sv" {
+            throw TranscribeError.message("Pianissimo requires --language sv. Use Whisper for other languages or mixed recordings.")
+        }
+        let transcriber: any TranscriptionEngine = engineName == "pianissimo" ? pianissimo : engine
         let speakers = args.contains("--speakers")
         let progress: ProgressHandler = { update in
             if update.fraction == nil || update.transcription != nil {
@@ -71,10 +81,15 @@ import TranscribeCore
                 FileHandle.standardError.write(Data((update.message + sections + "\n").utf8))
             }
         }
-        if args.contains("--prepare") { try await engine.prepare(speakers: speakers, progress: progress) }
+        if args.contains("--prepare") {
+            if engineName == "pianissimo" {
+                try await pianissimo.prepare(progress: progress)
+                if speakers { try await engine.prepareSpeakers(progress: progress) }
+            } else { try await engine.prepare(speakers: speakers, progress: progress) }
+        }
         let original = try await store.importAudio(URL(fileURLWithPath: audioPath))
         let start = Date()
-        let transcript = try await engine.transcribe(audio: store.audioURL(original), transcript: original,
+        let transcript = try await transcriber.transcribe(audio: store.audioURL(original), transcript: original,
             language: selectedLanguage == "auto" ? nil : selectedLanguage, progress: progress)
         try store.save(transcript)
         var result = transcript

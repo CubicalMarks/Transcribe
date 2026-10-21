@@ -144,7 +144,10 @@ struct ContentView: View {
                 Text(language.name).tag(language.code)
             }
         }.frame(width: 220)
-            .help("For mixed-language recordings, use Automatic and review language switches. Choosing a language guides transcription, not translation.")
+            .disabled(model.transcriptionModel == .pianissimo)
+            .help(model.transcriptionModel == .pianissimo
+                ? "Pianissimo transcribes Swedish. Select Whisper in Settings → Local Models for English or mixed recordings."
+                : "For mixed-language recordings, use Automatic and review language switches. Choosing a language guides transcription, not translation.")
     }
 
     @ViewBuilder private var speakerOptions: some View {

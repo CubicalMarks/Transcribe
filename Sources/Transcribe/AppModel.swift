@@ -8,6 +8,13 @@ import TranscribeCore
 final class AppModel: NSObject, AVAudioRecorderDelegate {
     let store: TranscriptStore
     let engine: LocalSpeechEngine
+    let pianissimo: PianissimoEngine
+    var transcriptionModel = TranscriptionModel.whisperTurbo {
+        didSet {
+            UserDefaults.standard.set(transcriptionModel.rawValue, forKey: "transcriptionModel")
+            if transcriptionModel == .pianissimo { language = "sv" }
+        }
+    }
     var projects: [Transcript] = []
     var selectedID: UUID?
     var language = "auto"
@@ -29,7 +36,9 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
             }
         }
     }
-    var transcriptionReady = false
+    var whisperReady = false
+    var pianissimoReady = false
+    var transcriptionReady: Bool { transcriptionModel == .whisperTurbo ? whisperReady : pianissimoReady }
     var speakersReady = false
     var isRecording = false
     var isPaused = false
@@ -65,7 +74,10 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         }
         catch { fatalError("Cannot open Transcribe's local storage: \(error.localizedDescription)") }
         engine = LocalSpeechEngine(models: store.models)
+        pianissimo = PianissimoEngine(models: store.models)
         super.init()
+        if let saved = UserDefaults.standard.string(forKey: "transcriptionModel"),
+           let choice = TranscriptionModel(rawValue: saved) { transcriptionModel = choice }
         if let data = UserDefaults.standard.data(forKey: "summarySettings"),
            let saved = try? JSONDecoder().decode(SummarySettings.self, from: data) { summarySettings = saved }
         do { projects = try store.loadAll() }
@@ -79,11 +91,16 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     }
 
     func refreshModels() async {
+        pianissimoReady = await pianissimo.isPrepared()
         do {
             let state = try await engine.installation()
-            transcriptionReady = state.whisperFolder.map { FileManager.default.fileExists(atPath: $0) } ?? false
+            whisperReady = state.whisperFolder.map { FileManager.default.fileExists(atPath: $0) } ?? false
             speakersReady = state.speakerFolder.map { FileManager.default.fileExists(atPath: $0) } ?? false
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            whisperReady = false
+            speakersReady = false
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func tick() {
@@ -251,8 +268,17 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     }
 
     func prepareModels() {
+        let choice = transcriptionModel
+        let speakers = identifySpeakers
         run("Preparing local models…") { [self] id in
-            do { try await engine.prepare(speakers: identifySpeakers, progress: progress(for: id)) }
+            do {
+                switch choice {
+                case .whisperTurbo: try await engine.prepare(speakers: speakers, progress: progress(for: id))
+                case .pianissimo:
+                    try await pianissimo.prepare(progress: progress(for: id))
+                    if speakers { try await engine.prepareSpeakers(progress: progress(for: id)) }
+                }
+            }
             catch { await refreshModels(); throw error }
             await refreshModels()
         }
@@ -260,6 +286,10 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
 
     func transcribe() {
         guard !locked, !saveFailed, let transcript = selected else { return }
+        guard transcriptionModel.supports(language: language == "auto" ? nil : language) else {
+            errorMessage = "Pianissimo is Swedish-only. Select Whisper in Settings → Local Models for English or mixed recordings."
+            return
+        }
         guard modelsReady else { showModels = true; return }
         if !transcript.segments.isEmpty {
             let alert = NSAlert()
@@ -271,13 +301,14 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         }
         player?.stop()
         let selectedLanguage = language == "auto" ? nil : language
+        let transcriber: any TranscriptionEngine = transcriptionModel == .pianissimo ? pianissimo : engine
         let includeSpeakers = identifySpeakers
         let count = expectedSpeakers == 0 ? nil : expectedSpeakers
         showSummary = false
         transcriptionPreview = .init(duration: transcript.duration)
         run("Starting transcription…") { [self] id in
             let audio = try store.audioURL(transcript)
-            let result = try await engine.transcribe(audio: audio, transcript: transcript,
+            let result = try await transcriber.transcribe(audio: audio, transcript: transcript,
                 language: selectedLanguage, progress: progress(for: id))
             try Task.checkCancellation()
             try put(result)

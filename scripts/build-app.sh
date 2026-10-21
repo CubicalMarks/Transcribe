@@ -29,6 +29,8 @@ cp resources/Info.plist "$app_path/Contents/Info.plist"
 cp resources/ThirdPartyNotices.md "$app_path/Contents/Resources/"
 install -m 644 .build/checkouts/argmax-oss-swift/LICENSE "$app_path/Contents/Resources/Argmax-LICENSE.txt"
 install -m 644 .build/checkouts/argmax-oss-swift/NOTICES "$app_path/Contents/Resources/Argmax-NOTICES.txt"
+install -m 644 .build/checkouts/FluidAudio/LICENSE "$app_path/Contents/Resources/FluidAudio-LICENSE.txt"
+install -m 644 .build/checkouts/FluidAudio/ThirdPartyLicenses/fastcluster-LICENSE.md "$app_path/Contents/Resources/FluidAudio-fastcluster-LICENSE.md"
 for dependency in jwt-kit swift-crypto swift-certificates swift-asn1 swift-log; do
     for notice in LICENSE LICENSE.txt NOTICE.txt; do
         source_path=".build/checkouts/$dependency/$notice"

@@ -16,6 +16,24 @@ https://creativecommons.org/licenses/by/4.0/
 
 Model weights are downloaded separately by the user and are not bundled into this application. Keep model attribution and applicable notices with any redistribution. No Hugging Face login or acceptance is automated by this app; download failures are shown to the user.
 
+Experimental Swedish transcription uses FluidAudio (FluidInference, Apache 2.0),
+pinned at c79c4106b954f81205113c3343e5a7e59a1089b5. TTS, FluidAudio diarization
+and NeMo text processing traits are disabled. Full FluidAudio and incorporated
+fastcluster (BSD) license texts are bundled in Resources.
+https://github.com/FluidInference/FluidAudio
+
+Pianissimo model: Klang AI, fine-tuned from NVIDIA Parakeet TDT 0.6B v3,
+CC BY 4.0. Community Core ML conversion by magnushjelm, adapted from
+FluidInference's mobius conversion scripts; encoder weights compressed with
+8-bit k-means palettization. This is a conversion of the original model,
+not Klang's official MLX package. The preprocessor and vocabulary are retained
+from Parakeet v3. Model revision: ff8af835072b77a880991ce2d5402d249f923886.
+The downloaded model card is retained with the weights.
+https://huggingface.co/KlangAI/pianissimo-sv
+https://huggingface.co/magnushjelm/pianissimo-sv-coreml
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+https://creativecommons.org/licenses/by/4.0/
+
 The app contains no analytics. Audio inference runs locally. Model/tokenizer preparation downloads files; optional API summarisation sends transcript text to the user-configured endpoint. On-device summarisation uses the macOS Foundation Models framework and Apple Intelligence model.
 
 

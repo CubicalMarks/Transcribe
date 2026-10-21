@@ -67,7 +67,14 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
             state.whisperFolder = folder.path
             try saveInstallation(state)
         }
-        if speakers, state.speakerFolder == nil {
+        if speakers { try await prepareSpeakers(progress: progress) }
+    }
+
+    public func prepareSpeakers(progress: @escaping ProgressHandler) async throws {
+        try FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
+        var state = try installation()
+        if let folder = state.speakerFolder, !FileManager.default.fileExists(atPath: folder) { state.speakerFolder = nil }
+        if state.speakerFolder == nil {
             await progress(.init("Downloading speaker models…"))
             let manager = SpeakerKitDiarizer.pyannote(config: PyannoteConfig(downloadBase: models.path,
                 download: true, verbose: false, concurrentSegmenterWorkers: 2, concurrentEmbedderWorkers: 2))
@@ -162,27 +169,38 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
                 Task { await progress(.init("Identifying speakers on this Mac…", fraction: fraction)) }
             }
             try Task.checkCancellation()
-            var output = transcript
-            if !transcript.textEdited, let data = transcript.alignmentData {
-                let source = try JSONDecoder().decode([TranscriptionResult].self, from: data)
-                output.segments = Self.assemble(source: source, diarization: result)
-            } else {
-                // Never replace edited text when speakers are added or rerun.
-                output.segments = transcript.segments.map { segment in
-                    var updated = segment
-                    updated.speakerID = Self.bestSpeaker(start: segment.start, end: segment.end, turns: result.segments)
-                    return updated
-                }
-            }
-            output.speakersIdentified = true
-            // Cluster IDs can change on a rerun; old names cannot safely follow them.
-            output.speakerNames = [:]
+            let output = Self.attributeSpeakers(in: transcript, diarization: result)
             await pipe.unloadModels()
             return output
         } catch {
             await pipe.unloadModels()
             throw error
         }
+    }
+
+    static func attributeSpeakers(in transcript: Transcript, diarization result: DiarizationResult) -> Transcript {
+        var output = transcript
+        if !transcript.textEdited, let data = transcript.alignmentData,
+           let alignment = try? JSONDecoder().decode(WordAlignment.self, from: data),
+           alignment.covers(transcript.segments.map(\.text).joined()) {
+            output.segments = alignment.segments {
+                Self.bestSpeaker(start: $0, end: $1, turns: result.segments)
+            }
+        } else if !transcript.textEdited, let data = transcript.alignmentData,
+                  let source = try? JSONDecoder().decode([TranscriptionResult].self, from: data) {
+            output.segments = Self.assemble(source: source, diarization: result)
+        } else {
+            // Never replace edited text when speakers are added or rerun.
+            output.segments = transcript.segments.map { segment in
+                var updated = segment
+                updated.speakerID = Self.bestSpeaker(start: segment.start, end: segment.end, turns: result.segments)
+                return updated
+            }
+        }
+        output.speakersIdentified = true
+        // Cluster IDs can change on a rerun; old names cannot safely follow them.
+        output.speakerNames = [:]
+        return output
     }
 
     public static func assemble(source: [TranscriptionResult], diarization: DiarizationResult) -> [TranscriptSegment] {

@@ -12,9 +12,26 @@ struct ModelsView: View {
             Text("Local models").font(.title2.weight(.semibold)).padding(.horizontal, 24).padding(.top, 24)
             Form {
                 Section {
-                    modelRow("Whisper Turbo", subtitle: "Multilingual transcription · compressed 626 MB variant", ready: model.transcriptionReady)
+                    Picker("Model", selection: $model.transcriptionModel) {
+                        ForEach(TranscriptionModel.allCases, id: \.self) { choice in
+                            Text(choice.title).tag(choice)
+                        }
+                    }.disabled(model.locked)
+                    modelRow(model.transcriptionModel.title, subtitle: model.transcriptionModel.detail, ready: model.transcriptionReady)
+                    if model.transcriptionModel == .pianissimo {
+                        Text("Swedish only. Use Whisper for English or mixed recordings. This experimental conversion has not been validated on natural meetings. Custom vocabulary is not available in this integration.")
+                            .font(.body).foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Transcription")
+                } footer: {
+                    Text("Selection applies to the next transcription. Existing transcripts and downloaded models are kept.")
+                }
+                Section {
                     modelRow("SpeakerKit", subtitle: "Voice separation · Pyannote-based Core ML models", ready: model.speakersReady)
                     Toggle("Prepare speaker identification too", isOn: $model.identifySpeakers).disabled(model.locked)
+                } header: {
+                    Text("Speaker identification")
                 } footer: {
                     Text("Download once from Hugging Face, then transcribe offline. Audio processing stays on your Mac. First preparation can take several minutes.")
                         .font(.body)
@@ -24,7 +41,8 @@ struct ModelsView: View {
                     DisclosureGroup("Models and attribution", isExpanded: $showAttribution) {
                         Link("Whisper models", destination: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml")!)
                         Link("Speaker models & attribution", destination: URL(string: "https://huggingface.co/argmaxinc/speakerkit-coreml")!)
-                        Text("WhisperKit and SpeakerKit: Argmax, MIT. Whisper models: MIT. Speaker models: CC BY 4.0, derived from Pyannote; converted and quantized by Argmax. See the bundled ThirdPartyNotices for details.")
+                        Link("Pianissimo Core ML conversion", destination: URL(string: "https://huggingface.co/magnushjelm/pianissimo-sv-coreml")!)
+                        Text("WhisperKit and SpeakerKit: MIT. FluidAudio: Apache 2.0. Whisper models: MIT. Speaker models: CC BY 4.0, derived from Pyannote; converted by Argmax. Pianissimo: Klang AI, based on NVIDIA Parakeet v3, CC BY 4.0; Core ML conversion by magnushjelm with 8-bit encoder compression. See the bundled ThirdPartyNotices for details.")
                             .font(.body).foregroundStyle(.secondary)
                     }
                 }
