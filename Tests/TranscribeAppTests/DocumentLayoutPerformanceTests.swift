@@ -5,7 +5,11 @@ import TranscribeCore
 @testable import Transcribe
 
 @MainActor final class DocumentLayoutPerformanceTests: XCTestCase {
-    func testDocumentScrollLayout() throws {
+    func testDocumentScrollLayout() throws { try exerciseScroll(rapid: false) }
+
+    func testRapidScrollAcrossFullDocument() throws { try exerciseScroll(rapid: true) }
+
+    private func exerciseScroll(rapid: Bool) throws {
         _ = NSApplication.shared
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -34,15 +38,21 @@ import TranscribeCore
         }
         let document = try XCTUnwrap(scrollViews(host).filter { $0.bounds.width > 500 }.first)
         let scrollStart = Date()
-        for step in 0..<30 {
-            document.contentView.scroll(to: NSPoint(x: 0, y: (step % 15) * 160))
+        var slowest: TimeInterval = 0
+        let passes = rapid ? 240 : 30
+        for step in 0..<passes {
+            let stepStart = Date()
+            let maximum = max(0, (document.documentView?.frame.height ?? 0) - document.contentView.bounds.height)
+            let position = rapid ? maximum * Double((step * 37) % 101) / 100 : Double((step % 15) * 160)
+            document.contentView.scroll(to: NSPoint(x: 0, y: position))
             document.reflectScrolledClipView(document.contentView)
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.001))
             host.layoutSubtreeIfNeeded()
             _ = host.fittingSize
+            slowest = max(slowest, Date().timeIntervalSince(stepStart))
         }
         let scrollTime = Date().timeIntervalSince(scrollStart)
-        print(String(format: "DOCUMENT_LAYOUT initial=%.4fs scroll30=%.4fs rows=%d", initial, scrollTime, transcript.segments.count))
+        print(String(format: "DOCUMENT_LAYOUT initial=%.4fs scroll%d=%.4fs slowest=%.4fs rows=%d", initial, passes, scrollTime, slowest, transcript.segments.count))
         XCTAssertEqual(model.selected?.segments, transcript.segments)
 
         // Exercise the real SwiftUI/native binding and frame, not just the
