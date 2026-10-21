@@ -99,6 +99,10 @@ public struct ChatGPTSummaryGenerator: SummaryTextGenerator {
     }
 
     public func generate(instructions: String, input: String, maxTokens: Int) async throws -> String {
+        try await generateMeasured(instructions: instructions, input: input, maxTokens: maxTokens).text
+    }
+
+    public func generateMeasured(instructions: String, input: String, maxTokens: Int) async throws -> GeneratedText {
         let token = try await client.accessToken(for: accountID)
         let request = try request(token: token, instructions: instructions, input: input)
         let (bytes, response) = try await session.bytes(for: request)
@@ -111,12 +115,14 @@ public struct ChatGPTSummaryGenerator: SummaryTextGenerator {
         var stream = ChatGPTResponseStream(requestID: http.value(forHTTPHeaderField: "x-request-id"))
         // AsyncBytes.lines drops blank lines on macOS. SSE requires those event boundaries.
         for try await byte in bytes { try stream.byte(byte) }
-        return try stream.result()
+        let text = try stream.result()
+        return GeneratedText(text: text, usage: stream.usage)
     }
 }
 
 // Do not treat partial output or an ended stream as a successful summary.
 struct ChatGPTResponseStream {
+    private(set) var usage: TokenUsage?
     private var eventData: [String] = []
     private var eventBytes = 0
     private var completedText: String?
@@ -216,6 +222,7 @@ struct ChatGPTResponseStream {
                 throw TranscribeError.message("ChatGPT completed without summary text (\(textEventCount) text events, \(output.count) final output items). Try another available model or try again. The previous summary is kept." + (id.map { " Request ID: \($0)." } ?? ""))
             }
             completedText = text
+            usage = TokenUsage.parse(response["usage"])
         }
     }
 

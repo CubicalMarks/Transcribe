@@ -433,8 +433,12 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     }
 
     private func cleanUpSavedTranscript(_ transcript: Transcript, progress: @escaping ProgressHandler) async throws {
+        try Task.checkCancellation()
+        let grouping = try TranscriptCleanup.groupFragments(in: transcript)
+        let readable = try grouping.applying(to: transcript)
+        if grouping.hasChanges { try put(readable) }
         let generator = try textGenerator(for: summarySettings)
-        let result = try await TranscriptCleanup.generate(transcript: transcript, using: generator, progress: progress)
+        let result = try await TranscriptCleanup.generate(transcript: readable, using: generator, progress: progress)
         try Task.checkCancellation()
         guard let current = selected, current.id == transcript.id else {
             throw TranscribeError.message("The selected recording changed. Cleanup was not saved.")

@@ -2,6 +2,14 @@ import XCTest
 @testable import TranscribeCore
 
 final class ChatGPTStreamTests: XCTestCase {
+    func testCompletedStreamExposesReportedUsageWithoutMixingItWithText() throws {
+        var stream = ChatGPTResponseStream()
+        try feed(&stream, #"{"type":"response.output_text.delta","delta":"[]"}"#)
+        try feed(&stream, #"{"type":"response.completed","response":{"status":"completed","output":[],"usage":{"input_tokens":100,"output_tokens":50,"total_tokens":150,"output_tokens_details":{"reasoning_tokens":30}}}}"#)
+        XCTAssertEqual(try stream.result(), "[]")
+        XCTAssertEqual(stream.usage?.input, 100)
+        XCTAssertEqual(stream.usage?.reasoningOutput, 30)
+    }
     private let compactCompletion = #"{"type":"response.completed","response":{"status":"completed","output":[]}}"#
 
     private func feed(_ stream: inout ChatGPTResponseStream, _ event: String) throws {

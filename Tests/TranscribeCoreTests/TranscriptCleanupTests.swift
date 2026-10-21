@@ -17,7 +17,59 @@ private actor CleanupFixtureGenerator: SummaryTextGenerator {
     }
 }
 
+private struct SparseCleanupGenerator: SummaryTextGenerator {
+    let inputByteLimit = 16_000
+    func generate(instructions: String, input: String, maxTokens: Int) async throws -> String {
+        let entries = try JSONDecoder().decode([TranscriptCleanup.Entry].self, from: Data(input.utf8))
+        return try TranscriptCleanup.encode(entries.compactMap {
+            $0.text == "needs punctuation" ? .init(id: $0.id, text: "Needs punctuation.") : nil
+        })
+    }
+}
+
 final class TranscriptCleanupTests: XCTestCase {
+    func testSparseResponseKeepsOmittedSourceTextAndMetadata() async throws {
+        var source = Transcript(title: "Sparse", audioFilename: "audio.wav")
+        source.segments = [.init(start: 0, end: 2, text: "Already correct.", speakerID: 0),
+                           .init(start: 2, end: 5, text: "needs punctuation", speakerID: 1),
+                           .init(start: 6, end: 7, text: "Zylvra: 15,000 SEK; not approved.")]
+        let result = try await TranscriptCleanup.generate(transcript: source, using: SparseCleanupGenerator(), progress: { _ in })
+        var expected = source.segments
+        expected[1].text = "Needs punctuation."
+        XCTAssertEqual(result.proposed, expected)
+        XCTAssertEqual(try result.applying(to: source).beforeCleanup, source.segments)
+    }
+
+    func testLocalGroupingPreservesWordsAndBoundsWithoutGuessingSpeakers() throws {
+        var source = Transcript(title: "Grouping", audioFilename: "audio.wav")
+        source.segments = [.init(start: 0, end: 2, text: "first", speakerID: 0),
+                           .init(start: 2.5, end: 5, text: "second", speakerID: 0),
+                           .init(start: 5, end: 6, text: "unknown"),
+                           .init(start: 6, end: 7, text: "still unknown"),
+                           .init(start: 7, end: 8, text: "third", speakerID: 0),
+                           .init(start: 8, end: 9, text: "fourth", speakerID: 1),
+                           .init(start: 11, end: 12, text: "pause", speakerID: 1),
+                           .init(start: 11, end: 13, text: "overlap", speakerID: 1),
+                           .init(start: 13, end: 50, text: "long", speakerID: 1)]
+        let grouping = try TranscriptCleanup.groupFragments(in: source)
+        XCTAssertTrue(grouping.hasChanges)
+        XCTAssertEqual(grouping.proposed.count, source.segments.count - 1)
+        XCTAssertEqual(grouping.proposed[0].text, "first second")
+        XCTAssertEqual(grouping.proposed[0].id, source.segments[0].id)
+        XCTAssertEqual(grouping.proposed[0].start, 0)
+        XCTAssertEqual(grouping.proposed[0].end, 5)
+        XCTAssertEqual(Array(grouping.proposed.dropFirst()), Array(source.segments.dropFirst(2)))
+        let readable = try grouping.applying(to: source)
+        XCTAssertEqual(readable.beforeCleanup, source.segments)
+        XCTAssertEqual(readable.restoringBeforeCleanup().segments, source.segments)
+        var relabeled = readable
+        relabeled.segments[0].speakerID = nil
+        XCTAssertNil(relabeled.restoringBeforeCleanup().segments[0].speakerID)
+        XCTAssertFalse(try TranscriptCleanup.groupFragments(in: readable).hasChanges)
+        // Failure/cancellation of the later model pass cannot remove the saved local text or backup.
+        XCTAssertEqual(readable.segments.map(\.text).joined(separator: " "), source.segments.map(\.text).joined(separator: " "))
+    }
+
     func testCleanupApplyRestoreAndExportPreserveEvidenceAndAudioMetadata() async throws {
         var source = Transcript(title: "Synthetic", audioFilename: "audio.wav", duration: 5)
         source.segments = [.init(start: 1, end: 3, text: "simple fixture", speakerID: 2)]
@@ -27,7 +79,7 @@ final class TranscriptCleanupTests: XCTestCase {
         let draft = try await TranscriptCleanup.generate(transcript: source, using: CleanupFixtureGenerator(), progress: { _ in })
         XCTAssertEqual(source.segments[0].text, "simple fixture")
         XCTAssertNil(source.beforeCleanup)
-        XCTAssertEqual(draft.changedCount, 1)
+        XCTAssertTrue(draft.hasChanges)
         let cleaned = try draft.applying(to: source)
         XCTAssertEqual(cleaned.segments[0].text, "Simple fixture.")
         XCTAssertEqual(cleaned.segments[0].id, source.segments[0].id)
@@ -87,9 +139,11 @@ final class TranscriptCleanupTests: XCTestCase {
         XCTAssertEqual(source, before)
     }
 
-    func testMissingDuplicateInventedAndEmptySectionsAreRejected() throws {
+    func testSparseEditsAllowOmissionsButRejectDuplicateInventedAndEmptyEdits() throws {
         let expected = [TranscriptCleanup.Entry(id: "0:0", text: "Hej"), .init(id: "1:0", text: "världen")]
-        for entries in [Array(expected.prefix(1)), [expected[0], expected[0]],
+        XCTAssertEqual(try TranscriptCleanup.parse("[]", expected: expected, byteLimit: 2000).count, 0)
+        XCTAssertEqual(try TranscriptCleanup.parse(TranscriptCleanup.encode(Array(expected.prefix(1))), expected: expected, byteLimit: 2000).count, 1)
+        for entries in [[expected[0], expected[0]],
                         [expected[0], .init(id: "invented", text: "new")],
                         [expected[0], .init(id: "1:0", text: " ")]] {
             XCTAssertThrowsError(try TranscriptCleanup.parse(TranscriptCleanup.encode(entries), expected: expected, byteLimit: 2000))
