@@ -1,12 +1,30 @@
 import SwiftUI
 
+struct SpeakerNamesButton: View {
+    @Bindable var model: AppModel
+    @State private var presented = false
+
+    var body: some View {
+        Button("Speaker Names…") { presented = true }.disabled(model.locked)
+            .sheet(isPresented: $presented) { SpeakerNamesView(model: model) }
+    }
+}
+
 struct SpeakerNamesView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var names: [String: String] = [:]
-    @State private var speakerIDs: [Int] = []
-    @State private var recordingID: UUID?
+    private let speakerIDs: [Int]
+    private let recordingID: UUID?
     @State private var message: String?
+
+    init(model: AppModel) {
+        self.model = model
+        let transcript = model.selected
+        _names = State(initialValue: transcript?.speakerNames ?? [:])
+        speakerIDs = transcript?.speakerIDs ?? []
+        recordingID = transcript?.id
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -28,10 +46,5 @@ struct SpeakerNamesView: View {
                 }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(model.locked || model.saveFailed)
             }
         }.padding(28).frame(width: 420)
-            .onAppear {
-                recordingID = model.selectedID
-                names = model.selected?.speakerNames ?? [:]
-                speakerIDs = model.selected?.speakerIDs ?? []
-            }
     }
 }

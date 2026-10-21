@@ -83,7 +83,7 @@ Sources/Transcribe/             Window, recording, playback and app lifecycle
 Sources/TranscribeCore/         Transcript/storage and inference interfaces
 Sources/TranscribeProbe/        Real-model validation command
 Tests/TranscribeCoreTests/      Deterministic preservation tests
-Tests/TranscribeAppTests/       Native editor sizing, binding and undo tests
+Tests/TranscribeAppTests/       Native editor, document layout, binding and undo tests
 resources/                     Bundle metadata, entitlements and attribution
 scripts/                       Build/signing, icon generation and checks
 ```

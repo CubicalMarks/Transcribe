@@ -6,7 +6,6 @@ struct ContentView: View {
     @Bindable var model: AppModel
     @Environment(\.openSettings) private var openSettings
     @State private var dropTarget = false
-    @State private var showNames = false
 
     var body: some View {
         NavigationSplitView {
@@ -90,7 +89,6 @@ struct ContentView: View {
                 model.showModels = false
             }
         }
-        .sheet(isPresented: $showNames) { SpeakerNamesView(model: model) }
         .alert("Transcribe", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
@@ -130,16 +128,9 @@ struct ContentView: View {
     }
 
     private var options: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 16) {
-                transcriptionLanguage
-                speakerOptions
-                Spacer(minLength: 0)
-            }
-            VStack(alignment: .leading, spacing: 10) {
-                transcriptionLanguage
-                HStack(spacing: 16) { speakerOptions; Spacer(minLength: 0) }
-            }
+        TranscriptionOptionsLayout {
+            transcriptionLanguage
+            HStack(spacing: 16) { speakerOptions }
         }
     }
 
@@ -213,7 +204,7 @@ struct ContentView: View {
                 Spacer()
                 if !transcript.segments.isEmpty {
                     if transcript.speakersIdentified, !model.showSummary {
-                        Button("Speaker Names…") { showNames = true }.disabled(model.locked)
+                        SpeakerNamesButton(model: model)
                     }
                     Menu {
                         if model.showSummary {

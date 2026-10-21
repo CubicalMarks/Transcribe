@@ -21,6 +21,32 @@ import AppKit
         XCTAssertGreaterThan(view.measuredHeight(width: 240), 24)
     }
 
+    func testLayoutProbesAreFiniteAndDoNotResizeTheNativeFrame() {
+        let view = RecordingNSTextView()
+        view.frame = NSRect(x: 0, y: 0, width: 600, height: 100)
+        let frame = view.frame
+        view.setContent(String(repeating: "Short transcript section åäö.\n", count: 200))
+        for width in [CGFloat(0), CGFloat.infinity, CGFloat.nan] {
+            let size = view.fittingSize(proposedWidth: width)
+            XCTAssertTrue(size.width.isFinite && size.height.isFinite)
+            XCTAssertGreaterThanOrEqual(size.height, 24)
+        }
+        XCTAssertTrue(view.fittingSize(proposedWidth: nil).height.isFinite)
+        let liveWidth = view.textContainer?.containerSize.width
+        let wide = view.fittingSize(proposedWidth: 600)
+        let narrow = view.fittingSize(proposedWidth: 250)
+        let measuredPasses = view.layoutMeasurementCount
+        for _ in 0..<1000 {
+            XCTAssertEqual(view.fittingSize(proposedWidth: 600), wide)
+            XCTAssertEqual(view.fittingSize(proposedWidth: 0), CGSize(width: 0, height: 24))
+            XCTAssertEqual(view.fittingSize(proposedWidth: 250), narrow)
+        }
+        XCTAssertEqual(view.layoutMeasurementCount, measuredPasses)
+        XCTAssertEqual(view.textContainer?.containerSize.width, liveWidth)
+        XCTAssertEqual(view.frame, frame)
+        XCTAssertFalse(view.isVerticallyResizable)
+    }
+
     func testUnchangedUpdatesKeepCaretAndUndoButNewDocumentClearsUndo() throws {
         let view = RecordingNSTextView()
         view.setContent("Text with åäö")

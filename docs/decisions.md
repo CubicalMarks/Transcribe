@@ -152,3 +152,12 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Isolate playback in its own observed View so playhead ticks do not invalidate the document tree. Compute available speaker IDs once for a document render rather than scanning all sections in each row, and read each row's captured text without a second full-array search.
 - Speaker names use a local sheet draft and explicit Save Names/Cancel. Apply all names with one atomic project save; publish the updated names only after successful persistence. A failed save keeps the draft available for retry. Transcript and summary text retain immediate autosave.
 - This changes neither transcript formats nor inference/model selection. Avoid an asynchronous autosave queue or debounce lifecycle for this fix; source/audio preservation continues to use the existing synchronous atomic store.
+
+
+## Profiled document-layout performance (2026-10-21)
+
+- A paused interaction sample of the installed 0.3.8 app showed repeated SwiftUI/AppKit layout and minimum-size negotiation during scrolling and Speaker Names presentation. The earlier idle sample did not establish a bottleneck or speedup.
+- Replace ViewThatFits' two copies of the transcription controls with one Layout containing one language picker and one speaker-controls group. Preserve the horizontal spacing, vertically centered single row, stacked fallback, complete language list, toggle and count choices. This avoids creating and destroying duplicate native picker/menu graphs during candidate fitting.
+- Native editor sizing always answers minimum/ideal/maximum probes with finite sizes. Measure attributed text in a separate TextKit container and cache several widths; hypothetical proposals must not resize or rewrap the live editor. SwiftUI owns the editor frame; content changes invalidate only measurement, avoiding a second native intrinsic-size/window-layout cascade.
+- Scope Speaker Names presentation state to its button, and initialize the draft before presentation instead of publishing several onAppear updates through the recording view. Keep Save Names/Cancel and atomic persistence unchanged.
+- Retain the interface, native text editing, font/spacing, timestamp playback, per-section speaker menus, immediate autosave and window Undo. No data format, inference, provider, credential or audio handling changes.
