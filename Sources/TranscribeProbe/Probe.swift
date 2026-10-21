@@ -23,16 +23,30 @@ import TranscribeCore
             transcribe-probe --summary-demo [--summary-api BASE_URL --summary-model MODEL]
             Summarises a fixed synthetic meeting. Without --summary-api, uses Apple's on-device model.
             Optional API credential: TRANSCRIBE_SUMMARY_API_KEY environment variable.
+
+            transcribe-probe --compare-speakers --transcript FILE --root LIBRARY --output DIRECTORY [--reuse-evidence DIRECTORY]
+            Compare local speaker settings using a saved transcript and its adjacent audio.
+            Reuses prepared models in LIBRARY/Models. Writes private evidence only to DIRECTORY; no downloads/uploads.
+            --reuse-evidence reapplies alignment to saved turns without inference; replay seconds are zero.
             """)
             return
         }
-        let known = Set(["--audio", "--root", "--prepare", "--speakers", "--language", "--engine", "--model", "--summary-demo", "--summary-api", "--summary-model"])
+        let known = Set(["--audio", "--root", "--prepare", "--speakers", "--language", "--engine", "--model", "--summary-demo", "--summary-api", "--summary-model", "--compare-speakers", "--transcript", "--output", "--reuse-evidence"])
         for arg in args where arg.hasPrefix("--") && !known.contains(arg) {
             throw TranscribeError.message("Unknown option: \(arg)")
         }
         func value(_ flag: String) -> String? {
             guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1), !args[index + 1].hasPrefix("--") else { return nil }
             return args[index + 1]
+        }
+        if args.contains("--compare-speakers") {
+            guard let transcript = value("--transcript"), let root = value("--root"), let output = value("--output") else {
+                throw TranscribeError.message("--compare-speakers requires --transcript, --root and --output.")
+            }
+            try await SpeakerComparison.run(transcript: URL(fileURLWithPath: transcript),
+                models: URL(fileURLWithPath: root).appendingPathComponent("Models"), output: URL(fileURLWithPath: output),
+                reuseEvidence: value("--reuse-evidence").map { URL(fileURLWithPath: $0) })
+            return
         }
         if args.contains("--summary-demo") {
             var settings = SummarySettings()

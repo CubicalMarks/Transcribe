@@ -179,13 +179,13 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
         }
     }
 
-    static func attributeSpeakers(in transcript: Transcript, diarization result: DiarizationResult) -> Transcript {
+    public static func attributeSpeakers(in transcript: Transcript, diarization result: DiarizationResult) -> Transcript {
         var output = transcript
         if !transcript.textEdited, let data = transcript.alignmentData,
            let alignment = try? JSONDecoder().decode(WordAlignment.self, from: data),
            alignment.covers(transcript.segments.map(\.text).joined()) {
             output.segments = alignment.segments {
-                Self.bestSpeaker(start: $0, end: $1, turns: result.segments)
+                Self.bestSpeaker(start: $0, end: $1, turns: result.segments, boundaryTolerance: 0.15)
             }
         } else if !transcript.textEdited, let data = transcript.alignmentData,
                   let source = try? JSONDecoder().decode([TranscriptionResult].self, from: data) {
@@ -221,13 +221,28 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
         }}.filter { !$0.text.isEmpty }.sorted { $0.start < $1.start }
     }
 
-    private static func bestSpeaker(start: Double, end: Double, turns: [SpeakerSegment]) -> Int? {
+    private static func bestSpeaker(start: Double, end: Double, turns: [SpeakerSegment], boundaryTolerance: Double = 0) -> Int? {
+        guard start.isFinite, end.isFinite, start >= 0, end >= start else { return nil }
         var overlaps: [Int: Double] = [:]
+        var nearby: Set<Int> = []
         for turn in turns {
             guard let id = turn.speaker.speakerId else { continue }
-            let overlap = max(0, min(end, Double(turn.endTime)) - max(start, Double(turn.startTime)))
+            let turnStart = Double(turn.startTime), turnEnd = Double(turn.endTime)
+            guard turnStart.isFinite, turnEnd.isFinite, turnEnd > turnStart else { continue }
+            // A point timing has no interval area, but can still lie inside speech.
+            let overlap = start == end && start >= turnStart && start < turnEnd
+                ? 1 : max(0, min(end, turnEnd) - max(start, turnStart))
             if overlap > 0 { overlaps[id, default: 0] += overlap }
+            if boundaryTolerance > 0, end - start <= 0.5 {
+                let gap = max(0, max(turnStart - end, start - turnEnd))
+                if gap <= boundaryTolerance { nearby.insert(id) }
+            }
         }
-        return overlaps.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.first?.key
+        if let matched = overlaps.sorted(by: { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }).first?.key {
+            return matched
+        }
+        // Repair only short word/turn timing mismatches. Competing nearby labels
+        // remain unassigned; do not extend speaker turns or smooth actual switches.
+        return nearby.count == 1 ? nearby.first : nil
     }
 }

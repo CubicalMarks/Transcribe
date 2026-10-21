@@ -31,7 +31,7 @@ Local Models saves a multilingual default (currently Whisper Turbo), with **Use 
 
 Readiness is shown per configured model and independently for SpeakerKit. Preparing configured models downloads the default, overrides and optionally speaker models; transcription itself requires only the model for the selected language and any enabled speaker models. Pianissimo downloads about 632 MB from a pinned community conversion, verifies file sizes and available weight checksums, and records readiness only after loading the exact local components. Its decoder works in 15-second windows for longer audio. This is not Klang's official MLX implementation; its reported MLX speed/accuracy and phrase boosting do not carry over as validated features. Custom vocabulary is not exposed. Natural Swedish meetings, overlap and code-switching still need evaluation; Whisper remains the default.
 
-During transcription, a read-only live preview shows completed sections with timestamps. Loading the model has its own status; audio-position progress advances as decoded sections finish, then speaker identification runs as a separate stage. This is progress through the recording, not a wall-clock ETA. Transcription exports become available when the new text is saved. Cancellation or failure discards the temporary preview and keeps the last saved transcript and audio; controls remain busy until the engine returns. Rerunning transcription asks before replacing edits. Rerunning speakers preserves edited text but clears names because cluster IDs may change. Labels are estimates within one recording, not recognition of named people across recordings.
+During transcription, a read-only live preview shows completed sections with timestamps. Loading the model has its own status; audio-position progress advances as decoded sections finish, then speaker identification runs as a separate stage. This is progress through the recording, not a wall-clock ETA. Transcription exports become available when the new text is saved. Cancellation or failure discards the temporary preview and keeps the last saved transcript and audio; controls remain busy until the engine returns. Rerunning transcription asks before replacing edits. Rerunning speakers preserves edited text but clears names because cluster IDs may change. Labels are estimates within one recording, not recognition of named people across recordings. Background voices can produce additional labels. Setting a fixed count changes clustering; it does not isolate the foreground participants or remove background speech.
 
 Transcription saves the speech model’s output directly, without automatic text cleanup or paragraph joining. Existing transcripts and edits remain as saved; legacy private original-text backups are retained in project storage and excluded from exports.
 
@@ -92,6 +92,17 @@ swift run transcribe-probe --audio /path/to/synthetic-swedish.wav \
 ```
 
 `--engine` defaults to `whisper`. Pianissimo requires `--language sv` and rejects `--model`; its model revision is pinned. Omit `--speakers` to test transcription alone. See [validation](docs/validation.md) for checked behavior and limits.
+
+Compare speaker settings against an explicitly selected saved transcript and its adjacent source audio:
+
+```sh
+swift run transcribe-probe --compare-speakers \
+  --transcript /path/to/private-library/Projects/UUID/transcript.json \
+  --root /path/to/private-library --output /path/to/private-comparison
+```
+
+This reuses prepared SpeakerKit models and writes private transcripts/turn evidence for Automatic, two speakers, clustering thresholds 0.5/0.7 and a 0.2-second segment-gap experiment. It never downloads models or uploads audio/text. Add `--reuse-evidence /path/to/private-comparison` with a **different output directory** to replay alignment without inference; replay durations are zero, not inference timings. Use ignored private directories for all outputs. See [speaker evaluation](docs/speaker-evaluation.md) for the measured result and its accuracy limits.
+
 
 ```text
 Sources/Transcribe/             Window, recording, playback and app lifecycle
