@@ -6,24 +6,37 @@ import TranscribeCore
 
 @MainActor @Observable
 final class AppModel: NSObject, AVAudioRecorderDelegate {
+    @ObservationIgnored private let preferences: UserDefaults
     let store: TranscriptStore
     let engine: LocalSpeechEngine
     let pianissimo: PianissimoEngine
-    var transcriptionModel = TranscriptionModel.whisperTurbo {
+    var transcriptionPreferences = TranscriptionPreferences() {
         didSet {
-            UserDefaults.standard.set(transcriptionModel.rawValue, forKey: "transcriptionModel")
-            if transcriptionModel == .pianissimo { language = "sv" }
+            if let data = try? JSONEncoder().encode(transcriptionPreferences) {
+                preferences.set(data, forKey: "transcriptionPreferences")
+            }
         }
     }
+    var transcriptionModel: TranscriptionModel { transcriptionPreferences.model(for: language) }
     var projects: [Transcript] = []
     var selectedID: UUID?
-    var language = "auto"
+    var language: String {
+        get { selected?.requestedLanguage ?? transcriptionPreferences.newRecordingLanguage }
+        set {
+            guard !locked, !saveFailed else { return }
+            transcriptionPreferences.lastSelectedLanguage = newValue
+            if selected != nil { edit { $0.requestedLanguage = newValue } }
+        }
+    }
     var identifySpeakers = true
     var expectedSpeakers = 0
     var isBusy = false
     var status = ""
     var fraction: Double?
     var transcriptionPreview: TranscriptionPreview?
+    var cleanupEnabled = false {
+        didSet { preferences.set(cleanupEnabled, forKey: "cleanupEnabled") }
+    }
     var errorMessage: String?
     var showModels = false
     var settingsPage = SettingsPage.models
@@ -32,13 +45,17 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     var summarySettings = SummarySettings() {
         didSet {
             if let data = try? JSONEncoder().encode(summarySettings) {
-                UserDefaults.standard.set(data, forKey: "summarySettings")
+                preferences.set(data, forKey: "summarySettings")
             }
         }
     }
     var whisperReady = false
     var pianissimoReady = false
     var transcriptionReady: Bool { transcriptionModel == .whisperTurbo ? whisperReady : pianissimoReady }
+    var configuredModelsReady: Bool {
+        transcriptionPreferences.configuredModels.allSatisfy { isPrepared($0) } && (!identifySpeakers || speakersReady)
+    }
+    func isPrepared(_ model: TranscriptionModel) -> Bool { model == .whisperTurbo ? whisperReady : pianissimoReady }
     var speakersReady = false
     var isRecording = false
     var isPaused = false
@@ -67,7 +84,10 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     }
 
 
-    override init() {
+    override convenience init() { self.init(preferences: .standard) }
+
+    init(preferences: UserDefaults) {
+        self.preferences = preferences
         do {
             let override = ProcessInfo.processInfo.environment["TRANSCRIBE_LIBRARY_PATH"].map { URL(fileURLWithPath: $0) }
             store = try TranscriptStore(root: override)
@@ -76,9 +96,14 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         engine = LocalSpeechEngine(models: store.models)
         pianissimo = PianissimoEngine(models: store.models)
         super.init()
-        if let saved = UserDefaults.standard.string(forKey: "transcriptionModel"),
-           let choice = TranscriptionModel(rawValue: saved) { transcriptionModel = choice }
-        if let data = UserDefaults.standard.data(forKey: "summarySettings"),
+        cleanupEnabled = preferences.bool(forKey: "cleanupEnabled")
+        if let data = preferences.data(forKey: "transcriptionPreferences"),
+           let saved = try? JSONDecoder().decode(TranscriptionPreferences.self, from: data) {
+            transcriptionPreferences = saved
+        } else {
+            transcriptionPreferences = .init(legacyModel: preferences.string(forKey: "transcriptionModel").flatMap(TranscriptionModel.init(rawValue:)))
+        }
+        if let data = preferences.data(forKey: "summarySettings"),
            let saved = try? JSONDecoder().decode(SummarySettings.self, from: data) { summarySettings = saved }
         do { projects = try store.loadAll() }
         catch { errorMessage = error.localizedDescription }
@@ -219,7 +244,8 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         guard !locked, !saveFailed else { return }
         player?.stop()
         run("Importing audio…") { [self] _ in
-            let transcript = try await store.importAudio(url)
+            var transcript = try await store.importAudio(url)
+            transcript.requestedLanguage = transcriptionPreferences.newRecordingLanguage
             try Task.checkCancellation()
             try put(transcript)
             loadPlayback()
@@ -268,16 +294,17 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
     }
 
     func prepareModels() {
-        let choice = transcriptionModel
+        let choices = TranscriptionModel.allCases.filter { transcriptionPreferences.configuredModels.contains($0) }
         let speakers = identifySpeakers
         run("Preparing local models…") { [self] id in
             do {
-                switch choice {
-                case .whisperTurbo: try await engine.prepare(speakers: speakers, progress: progress(for: id))
-                case .pianissimo:
-                    try await pianissimo.prepare(progress: progress(for: id))
-                    if speakers { try await engine.prepareSpeakers(progress: progress(for: id)) }
+                for choice in choices {
+                    switch choice {
+                    case .whisperTurbo: try await engine.prepare(speakers: false, progress: progress(for: id))
+                    case .pianissimo: try await pianissimo.prepare(progress: progress(for: id))
+                    }
                 }
+                if speakers { try await engine.prepareSpeakers(progress: progress(for: id)) }
             }
             catch { await refreshModels(); throw error }
             await refreshModels()
@@ -303,12 +330,13 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         let selectedLanguage = language == "auto" ? nil : language
         let transcriber: any TranscriptionEngine = transcriptionModel == .pianissimo ? pianissimo : engine
         let includeSpeakers = identifySpeakers
+        let includeCleanup = cleanupEnabled
         let count = expectedSpeakers == 0 ? nil : expectedSpeakers
         showSummary = false
         transcriptionPreview = .init(duration: transcript.duration)
         run("Starting transcription…") { [self] id in
             let audio = try store.audioURL(transcript)
-            let result = try await transcriber.transcribe(audio: audio, transcript: transcript,
+            var result = try await transcriber.transcribe(audio: audio, transcript: transcript,
                 language: selectedLanguage, progress: progress(for: id))
             try Task.checkCancellation()
             try put(result)
@@ -318,7 +346,9 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
                     count: count, progress: progress(for: id))
                 try Task.checkCancellation()
                 try put(attributed)
+                result = attributed
             }
+            if includeCleanup { try await cleanUpSavedTranscript(result, progress: progress(for: id)) }
         }
     }
 
@@ -342,25 +372,28 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
         }
     }
 
+    private func textGenerator(for settings: SummarySettings) throws -> any SummaryTextGenerator {
+        if settings.backend == .onDevice {
+            if let reason = OnDeviceSummaryGenerator.unavailableReason { throw TranscribeError.message(reason) }
+            return OnDeviceSummaryGenerator()
+        } else if settings.backend == .chatGPT {
+            guard !chatGPT.busy else { throw TranscribeError.message("Finish connecting or signing out of ChatGPT before summarising.") }
+            guard let id = settings.chatGPTAccountID, let model = settings.chatGPTModel, !model.isEmpty else {
+                throw TranscribeError.message("Connect your ChatGPT account and choose a model in Settings first.")
+            }
+            return ChatGPTSummaryGenerator(client: chatGPT.client, accountID: id, model: model)
+        } else {
+            _ = try settings.completionURL()
+            return EndpointSummaryGenerator(settings: settings, apiKey: try SummaryKeychain.read(settings))
+        }
+    }
+
     func summarise() {
         guard !locked, !saveFailed, let transcript = selected, !transcript.segments.isEmpty else { return }
         let settings = summarySettings
         let generator: any SummaryTextGenerator
-        do {
-            if settings.backend == .onDevice {
-                if let reason = OnDeviceSummaryGenerator.unavailableReason { throw TranscribeError.message(reason) }
-                generator = OnDeviceSummaryGenerator()
-            } else if settings.backend == .chatGPT {
-                guard !chatGPT.busy else { throw TranscribeError.message("Finish connecting or signing out of ChatGPT before summarising.") }
-                guard let id = settings.chatGPTAccountID, let model = settings.chatGPTModel, !model.isEmpty else {
-                    throw TranscribeError.message("Connect your ChatGPT account and choose a model in Settings first.")
-                }
-                generator = ChatGPTSummaryGenerator(client: chatGPT.client, accountID: id, model: model)
-            } else {
-                _ = try settings.completionURL()
-                generator = EndpointSummaryGenerator(settings: settings, apiKey: try SummaryKeychain.read(settings))
-            }
-        } catch { errorMessage = error.localizedDescription; return }
+        do { generator = try textGenerator(for: settings) }
+        catch { errorMessage = error.localizedDescription; return }
         if transcript.summary != nil {
             let alert = NSAlert()
             alert.messageText = "Replace this summary?"
@@ -378,6 +411,62 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
             updated.summary = result
             try put(updated)
         }
+    }
+
+    var cleanupDestination: String {
+        switch summarySettings.backend {
+        case .onDevice: "On this Mac"
+        case .chatGPT: "ChatGPT plan · OpenAI"
+        case .endpoint: (try? summarySettings.completionURL().host) ?? "the configured API"
+        }
+    }
+
+    func cleanUpTranscript() {
+        guard !locked, !saveFailed, let transcript = selected, !transcript.segments.isEmpty else { return }
+        guard summaryProviderReady else {
+            errorMessage = "Choose an available provider in Settings → Text & AI before cleaning up a transcript."
+            return
+        }
+        run("Cleaning up transcript…") { [self] id in
+            try await cleanUpSavedTranscript(transcript, progress: progress(for: id))
+        }
+    }
+
+    private func cleanUpSavedTranscript(_ transcript: Transcript, progress: @escaping ProgressHandler) async throws {
+        let generator = try textGenerator(for: summarySettings)
+        let result = try await TranscriptCleanup.generate(transcript: transcript, using: generator, progress: progress)
+        try Task.checkCancellation()
+        guard let current = selected, current.id == transcript.id else {
+            throw TranscribeError.message("The selected recording changed. Cleanup was not saved.")
+        }
+        try put(result.applying(to: current))
+    }
+
+    func joinWithPrevious(_ segmentID: UUID) {
+        guard !locked, !saveFailed, let transcript = selected,
+              let index = transcript.segments.firstIndex(where: { $0.id == segmentID }), index > 0 else { return }
+        if transcript.segments[index - 1].speakerID != transcript.segments[index].speakerID {
+            let alert = NSAlert()
+            alert.messageText = "Join sections with different speaker labels?"
+            alert.informativeText = "The joined section will use \(transcript.speakerName(transcript.segments[index - 1].speakerID)). Both sections' words and the full time span are kept."
+            alert.addButton(withTitle: "Join Sections")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        do { try put(transcript.joiningWithPrevious(segmentID)); status = "Sections joined. Words and time span retained." }
+        catch { errorMessage = error.localizedDescription }
+    }
+
+    func restoreBeforeCleanup() {
+        guard !locked, !saveFailed, let transcript = selected, transcript.beforeCleanup != nil else { return }
+        let alert = NSAlert()
+        alert.messageText = "Restore the text from before cleanup?"
+        alert.informativeText = "This replaces current wording and section boundaries, including later text edits. Current speaker labels are kept where sections still match. Audio and saved summaries are retained."
+        alert.addButton(withTitle: "Restore Text")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { try put(transcript.restoringBeforeCleanup()); status = "Original text restored." }
+        catch { errorMessage = error.localizedDescription }
     }
 
     func copySummary() {
@@ -408,7 +497,8 @@ final class AppModel: NSObject, AVAudioRecorderDelegate {
             guard !locked else { return }
             do {
                 player?.stop()
-                let transcript = try store.createRecording()
+                var transcript = try store.createRecording()
+                transcript.requestedLanguage = transcriptionPreferences.newRecordingLanguage
                 let recorder = try AVAudioRecorder(url: store.audioURL(transcript), settings: [
                     AVFormatIDKey: kAudioFormatMPEG4AAC,
                     AVSampleRateKey: 44_100,

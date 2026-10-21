@@ -133,6 +133,7 @@ public actor PianissimoEngine: TranscriptionEngine {
         output.textEdited = false
         output.speakersIdentified = false
         output.speakerNames = [:]
+        output.beforeCleanup = nil
         return output
     }
 

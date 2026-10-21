@@ -24,6 +24,7 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
     public var audioFilename: String
     public var duration: Double
     public var language: String?
+    public var requestedLanguage: String?
     public var model: String?
     public var segments: [TranscriptSegment] = []
     public var speakerNames: [String: String] = [:]
@@ -32,6 +33,8 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
     // Engine-private alignment evidence, separate from the editable transcript.
     public var alignmentData: Data?
     public var summary: RecordingSummary?
+    /// First pre-cleanup text, retained until explicitly restored or retranscribed.
+    public var beforeCleanup: [TranscriptSegment]?
 
     public init(id: UUID = UUID(), title: String, audioFilename: String, duration: Double = 0) {
         self.id = id
@@ -54,6 +57,7 @@ public struct Transcript: Identifiable, Codable, Equatable, Sendable {
             // Export the public transcript without the engine's internal evidence.
             var copy = self
             copy.alignmentData = nil
+            copy.beforeCleanup = nil
             return try Self.encoder.encode(copy)
         }
         let lines = segments.map { segment in

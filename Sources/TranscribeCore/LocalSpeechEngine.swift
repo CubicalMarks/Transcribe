@@ -139,6 +139,7 @@ public actor LocalSpeechEngine: TranscriptionEngine, SpeakerEngine {
             output.textEdited = false
             output.speakersIdentified = false
             output.speakerNames = [:]
+            output.beforeCleanup = nil
             await pipe.unloadModels()
             return output
         } catch {

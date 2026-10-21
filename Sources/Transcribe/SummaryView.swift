@@ -92,7 +92,9 @@ struct SummarySettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Summarisation").font(.title2.weight(.semibold)).padding(.horizontal, 24).padding(.top, 24)
+            Text("Text & AI").font(.title2.weight(.semibold)).padding(.horizontal, 24).padding(.top, 24)
+            Text("Provider for summaries and optional transcript cleanup. Cleanup keeps the pre-cleanup text restorable.")
+                .font(.body).foregroundStyle(.secondary).padding(.horizontal, 24).padding(.top, 8)
             Form {
                 Section {
                     Picker("Provider", selection: Binding(get: { draft.provider }, set: { draft.useProvider($0) })) {
@@ -215,7 +217,7 @@ struct SummarySettingsView: View {
         }
         Section {
             Link("Manage ChatGPT Usage", destination: URL(string: "https://chatgpt.com/settings/usage")!)
-            Text("Summaries use your existing ChatGPT plan limits or available credits. Only transcript text is sent to OpenAI; audio stays on this Mac. No automatic switch to API billing.")
+            Text("Summaries and cleanup use your existing ChatGPT plan limits or available credits. Only transcript text is sent to OpenAI; audio stays on this Mac. No automatic switch to API billing.")
                 .font(.body).foregroundStyle(.secondary)
         }
     }

@@ -12,20 +12,44 @@ struct ModelsView: View {
             Text("Local models").font(.title2.weight(.semibold)).padding(.horizontal, 24).padding(.top, 24)
             Form {
                 Section {
-                    Picker("Model", selection: $model.transcriptionModel) {
-                        ForEach(TranscriptionModel.allCases, id: \.self) { choice in
+                    Picker("Default model", selection: $model.transcriptionPreferences.defaultModel) {
+                        ForEach(TranscriptionModel.allCases.filter { $0.supports(language: nil) }, id: \.self) { choice in
                             Text(choice.title).tag(choice)
                         }
                     }.disabled(model.locked)
-                    modelRow(model.transcriptionModel.title, subtitle: model.transcriptionModel.detail, ready: model.transcriptionReady)
-                    if model.transcriptionModel == .pianissimo {
-                        Text("Swedish only. Use Whisper for English or mixed recordings. This experimental conversion has not been validated on natural meetings. Custom vocabulary is not available in this integration.")
-                            .font(.body).foregroundStyle(.secondary)
-                    }
+                    Picker("Swedish model", selection: Binding(get: {
+                        model.transcriptionPreferences.languageModels["sv"]
+                    }, set: { model.transcriptionPreferences.languageModels["sv"] = $0 })) {
+                        Text("Use default").tag(TranscriptionModel?.none)
+                        ForEach(TranscriptionModel.allCases.filter { $0.supports(language: "sv") }, id: \.self) { choice in
+                            Text(choice.title).tag(Optional(choice))
+                        }
+                    }.disabled(model.locked)
+                    Picker("New recording language", selection: $model.transcriptionPreferences.defaultLanguage) {
+                        Text("Remember last selected").tag("last")
+                        Text("Automatic / mixed").tag("auto")
+                        Text("Swedish").tag("sv")
+                        Text("English").tag("en")
+                        Divider()
+                        ForEach(LocalSpeechEngine.languages.filter { !["sv", "en"].contains($0.code) }, id: \.code) { language in
+                            Text(language.name).tag(language.code)
+                        }
+                    }.disabled(model.locked)
                 } header: {
                     Text("Transcription")
                 } footer: {
-                    Text("Selection applies to the next transcription. Existing transcripts and downloaded models are kept.")
+                    Text("Automatic and languages without an override use the default model. New recordings and imports start with the language preference above; each recording keeps its own selection.")
+                }
+                Section {
+                    ForEach(TranscriptionModel.allCases.filter { model.transcriptionPreferences.configuredModels.contains($0) }, id: \.self) { choice in
+                        modelRow(choice.title, subtitle: choice.detail, ready: model.isPrepared(choice))
+                    }
+                    if model.transcriptionPreferences.configuredModels.contains(.pianissimo) {
+                        Text("Pianissimo is experimental and Swedish-only. Custom vocabulary is not available.")
+                            .font(.body).foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Configured models")
                 }
                 Section {
                     modelRow("SpeakerKit", subtitle: "Voice separation · Pyannote-based Core ML models", ready: model.speakersReady)
@@ -56,7 +80,7 @@ struct ModelsView: View {
             HStack {
                 if model.isBusy { Button("Cancel Processing", action: model.cancel) }
                 else {
-                    Button("Download & Prepare", action: model.prepareModels).buttonStyle(.borderedProminent).disabled(model.locked || model.modelsReady)
+                    Button("Prepare Configured Models", action: model.prepareModels).buttonStyle(.borderedProminent).disabled(model.locked || model.configuredModelsReady)
                 }
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
