@@ -8,10 +8,26 @@ public enum SummaryPreset: String, Codable, CaseIterable, Sendable {
     }
     public var instruction: String {
         switch self {
-        case .meetingNotes: "Use headings: Overview, Decisions, Action items, Open questions. Include owners and deadlines only when explicitly stated. State when none were mentioned."
-        case .brief: "Write a short prose overview of the key points and outcome."
-        case .actions: "List concrete action items, explicit owners, stated deadlines, and unresolved blockers. Do not turn suggestions into commitments. State when no actions were agreed."
+        case .meetingNotes: """
+            Write detailed meeting notes that someone who missed the conversation can use.
+            Start with a short overview of the purpose and outcome. Then use descriptive topic headings and specific bullets under each.
+            Cover every substantive topic, including smaller follow-ups near the end. Preserve concrete requirements, workflow steps and ordering,
+            rationale, constraints, dependencies, priorities, temporary workarounds, existing/completed work and unresolved choices when discussed.
+            Distinguish agreements from suggestions and corrections from superseded proposals. Keep optional details optional; do not settle open questions.
+            Capture concrete next steps and handoffs, with owners and deadlines only when explicitly stated. Keep these with their topic when practical.
+            End with a short set of key takeaways or follow-ups only if it adds useful synthesis rather than repeating the topic bullets.
+            Scale detail to the material: a substantive multi-topic meeting often needs 400–700 words; a short or simple conversation needs less.
+            Do not pad to a word target, omit a substantive topic to make the summary short, repeat headings, or create empty template sections.
+            """
+        case .brief: "Write a short prose overview of the key points and outcome. Keep the summary under 220 words."
+        case .actions: "List concrete action items, explicit owners, stated deadlines, and unresolved blockers. Do not turn suggestions into commitments. State when no actions were agreed. Keep the summary under 220 words."
         }
+    }
+
+    var outputTokenBudget: Int { self == .meetingNotes ? 2400 : 900 }
+
+    func excerptWordBudget(byteCount: Int) -> Int {
+        self == .meetingNotes ? min(600, max(60, byteCount / 16)) : 100
     }
 }
 

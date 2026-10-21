@@ -10,6 +10,24 @@ private actor RecordingGenerator: SummaryTextGenerator {
     }
 }
 
+private actor SummaryBudgetRecorder: SummaryTextGenerator {
+    nonisolated let inputByteLimit = 4000
+    struct Call: Sendable {
+        let instructions: String
+        let input: String
+        let maxTokens: Int
+    }
+    let finalText: String
+    var calls: [Call] = []
+
+    init(finalText: String) { self.finalText = finalText }
+
+    func generate(instructions: String, input: String, maxTokens: Int) async throws -> String {
+        calls.append(.init(instructions: instructions, input: input, maxTokens: maxTokens))
+        return instructions.contains("Extract compact factual notes") ? "Retained section evidence." : finalText
+    }
+}
+
 private final class MockSummaryProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var handler: ((URLRequest) throws -> (Int, Data))?
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -105,6 +123,44 @@ private final class MockSummaryProtocol: URLProtocol, @unchecked Sendable {
         XCTAssertEqual(chunks.joined(), source)
         XCTAssertTrue(chunks.allSatisfy { $0.utf8.count <= 81 })
         XCTAssertTrue(chunks.last?.contains("LAST SENTENCE") == true)
+    }
+
+    func testMeetingNotesAllowsRichOutputAndSectionEvidenceWithoutExpandingCompactPresets() async throws {
+        var transcript = Transcript(title: "Synthetic planning meeting", audioFilename: "not-sent.wav")
+        transcript.segments = (0..<8).map { index in
+            .init(start: Double(index * 30), end: Double(index * 30 + 25),
+                text: "Topic \(index): a proposed workflow was corrected; approval is needed before release. " + String(repeating: "Supporting discussion detail. ", count: 30))
+        }
+        for preset in SummaryPreset.allCases {
+            var settings = SummarySettings()
+            settings.preset = preset
+            settings.language = .swedish
+            settings.extraInstructions = "Prioritise dependencies."
+            let expected = preset == .meetingNotes ? String(repeating: "Detailed evidence. ", count: 150) : "Compact notes."
+            let generator = SummaryBudgetRecorder(finalText: expected)
+            let result = try await SummaryService.generate(transcript: transcript, settings: settings, using: generator, progress: { _ in })
+            let calls = await generator.calls
+            let sections = SummaryChunks.split(transcript.summarySource, byteLimit: generator.inputByteLimit)
+            XCTAssertGreaterThan(sections.count, 1)
+            XCTAssertEqual(Array(calls.prefix(sections.count).map(\.input)), sections)
+            XCTAssertTrue(calls.allSatisfy { $0.input.utf8.count <= generator.inputByteLimit })
+            let final = try XCTUnwrap(calls.last)
+            XCTAssertTrue(calls.allSatisfy { $0.instructions.contains(settings.extraInstructions) })
+            XCTAssertTrue(final.instructions.contains(settings.language.instruction))
+            if preset == .meetingNotes {
+                XCTAssertGreaterThan(final.maxTokens, 900)
+                XCTAssertTrue(calls.dropLast().allSatisfy { $0.maxTokens > 420 })
+                XCTAssertFalse(final.instructions.contains("under 220 words"))
+                XCTAssertGreaterThan(result.text.split(whereSeparator: { $0.isWhitespace }).count, 220)
+            } else {
+                XCTAssertEqual(final.maxTokens, 900)
+                XCTAssertTrue(calls.dropLast().allSatisfy { $0.maxTokens == 420 })
+                XCTAssertTrue(final.instructions.contains("under 220 words"))
+            }
+            XCTAssertEqual(result.text, expected.trimmingCharacters(in: .whitespacesAndNewlines))
+            XCTAssertEqual(result.sourceDigest, transcript.summarySourceDigest)
+            XCTAssertNil(transcript.summary)
+        }
     }
 
     func testLongSourceProcessesAllSectionsBeforeFinalSummary() async throws {
