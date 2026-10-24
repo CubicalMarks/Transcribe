@@ -208,3 +208,16 @@ No live hosted-provider or local Apple Intelligence generation quality claim is 
 - Remove replacement confirmations for transcription, speaker identification and summaries. Persist one previous transcript result and one previous summary alongside the successful replacement. Record the original transcript snapshot at the ASR save before any subsequent speaker work, and retain it throughout that same run. Speaker-only reruns capture the prior text/labels/names. Generation failures/cancellation do not replace saved data or consume recovery.
 - Restore is an explicit one-click action with no additional dialog. Restore only the selected document's generated/edited result, leaving title, requested language, source audio and the other document intact. Consume that document's backup after restore in the same atomic save. Summary staleness still follows its source digest.
 - Use a nonrecursive transcription snapshot for segments, labels/names, edit status, detected language/model, alignment and legacy private text history. Exclude both recovery snapshots from public JSON exports. Older projects decode without backups. Keep inference models, provider settings and source audio behavior unchanged; this supersedes earlier rerun-confirmation decisions.
+
+## Drag-to-Applications packaging (2026-10-24)
+
+- Add `make dmg` using the existing certificate/ad-hoc selection and fresh release build. Stage only the signed app, an Applications symlink and generated background; never package local libraries, model caches or signing configuration.
+- Write a custom icon-view layout directly, then convert the writable staging image to a compressed read-only DMG. Verify the staged app signature and final disk-image checksum before publishing the versioned arm64 image and SHA-256 sidecar in ignored `dist/`.
+- Use macOS tooling and Swift/AppKit, with pinned build-only `ds-store` and `mac-alias` libraries in an isolated ignored Python environment. No Python is bundled or required to install/run the app. Direct layout generation avoids Finder Automation permissions and timeouts. Fail rather than silently publish an unstyled image when layout configuration fails.
+- This packages local installation, without changing app identity, credentials, storage or inference. Developer ID signing, notarization and Gatekeeper acceptance on other Macs remain separate distribution work.
+
+## Local release command (2026-10-24)
+
+- `make release` uses the app's X.Y.Z version as its tag and asset version. Require a clean main at the same commit as origin/main, verify GitHub CLI's repository matches origin, and reject conflicting local/remote tags. Recheck source/remote main after building before pushing a tag.
+- Run source checks/tests and fresh DMG packaging before any remote writes. Upload only the DMG/checksum as a draft with generated or supplied notes and installation/signing limitations. Publication remains an explicit GitHub action. `--dry-run` is read-only and `--prerelease` marks preview releases.
+- Do not auto-commit, push branch changes, overwrite assets, retarget tags or delete partial releases. A failed upload retains the tag and directs the operator to inspect any partial draft. No CI signing credentials or notarization are introduced.

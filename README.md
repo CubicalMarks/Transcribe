@@ -15,6 +15,24 @@ open dist/Transcribe.app
 
 Use the same certificate and bundle identifier across updates so Keychain can recognize the app. Ad-hoc builds have a hash-based identity and can repeatedly request access; Always Allow does not provide a reliable update workflow for those builds. Switching from ad-hoc to certificate signing can require approving existing credentials once. This remains a local build without notarization; a certificate signature alone does not establish distribution readiness.
 
+## Install from a disk image
+
+Run `make dmg` to build/sign the current app and create `dist/Transcribe-<version>-arm64.dmg` with a SHA-256 sidecar. Open the image, drag **Transcribe** onto **Applications**, then launch it from Applications and eject the image. Quit an existing Transcribe instance before replacing it. The image includes the app and an Applications shortcut; models are prepared separately in the app and existing recordings/preferences remain in the local library.
+
+Packaging uses macOS tools plus two pinned Python libraries installed automatically in an isolated `.build/dmg-tools` environment; the first packaging run needs internet to obtain them. They write the Finder layout directly, without Automation permissions, and are not included in the app. The image is compressed and read-only, with a custom background and positioned icons. The app keeps the build's configured signature; the DMG is not notarized or signed for public distribution. Downloaded copies can still be blocked by Gatekeeper. Public distribution requires a separate Developer ID/notarization workflow.
+
+## GitHub releases
+
+Install/authenticate GitHub CLI (`gh auth login`) and use the usual local signing setup. Set the desired `CFBundleShortVersionString` and increment `CFBundleVersion` in `resources/Info.plist`, then commit and push all source changes to `main`. Version tags use `vX.Y.Z` and must identify the exact release commit.
+
+```sh
+bash scripts/release.sh --dry-run
+make release
+# Optional: make release RELEASE_ARGS="--prerelease --notes-file docs/release-notes.md"
+```
+
+The dry run checks local/remote Git state and repository access without building or writing tags/releases. `make release` requires a clean main matching origin, runs lint and all tests, builds a fresh DMG, verifies its SHA-256, pushes the version tag and creates a **draft** GitHub release with the DMG/checksum attached. By default it generates change notes and includes installation/signing limitations; `--notes-file` replaces the generated change notes. Review and publish the draft on GitHub. It never commits, pushes branch changes, moves existing tags or overwrites release assets. If uploading fails, the tag remains; inspect Releases for a partial draft before retrying. This is local build/upload automation; it does not add notarization or GitHub Actions signing.
+
 ## Usage
 
 1. Open **Settings → Local Models** (or the toolbar’s **Models** shortcut), choose a default model, a Swedish override if wanted, and a new-recording language preference, then **Prepare Configured Models**. **Whisper Turbo** is the default for multilingual recordings; **Pianissimo Swedish (experimental)** uses a community Core ML 8-bit conversion through FluidAudio. SpeakerKit is prepared separately when **Prepare speaker identification too** is enabled. First-time Core ML preparation can take several minutes. Prepared files are reused offline.
@@ -73,6 +91,8 @@ Microphone permission is requested when you choose Record. System/call audio and
 | Command | Purpose |
 | --- | --- |
 | `make build` | Build/sign `dist/Transcribe.app` |
+| `make dmg` | Build/sign and package a drag-to-Applications disk image |
+| `make release` | Check, build, tag and upload a draft GitHub release |
 | `make run` | Build and open the app |
 | `make lint` | Shell/config/package syntax and source whitespace |
 | `make test` | Preservation, storage, export and native-editor tests; no model downloads |
